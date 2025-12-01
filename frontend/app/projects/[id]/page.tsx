@@ -1,0 +1,207 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+import axios from "axios"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Image as ImageIcon, Tag, Layers, Brain, Rocket, Settings } from "lucide-react"
+
+interface Project {
+  id: number
+  name: string
+  description: string
+  project_type: string
+  created_at: string
+  classes: { name: string; color: string }[]
+}
+
+interface ProjectStats {
+  total_images: number
+  annotated_images: number
+  total_annotations: number
+  class_distribution: Record<string, number>
+  split_distribution: Record<string, number>
+}
+
+export default function ProjectOverview() {
+  const params = useParams()
+  const [project, setProject] = useState<Project | null>(null)
+  const [stats, setStats] = useState<ProjectStats | null>(null)
+
+  useEffect(() => {
+    if (params.id) {
+      fetchProject(Number(params.id))
+      fetchStats(Number(params.id))
+    }
+  }, [params.id])
+
+  const fetchProject = async (id: number) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/api/projects/${id}`)
+      setProject(response.data)
+    } catch (error) {
+      console.error("Failed to fetch project:", error)
+    }
+  }
+
+  const fetchStats = async (id: number) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/api/projects/${id}/stats`)
+      setStats(response.data)
+    } catch (error) {
+      console.error("Failed to fetch stats:", error)
+    }
+  }
+
+  if (!project) return <div className="p-8">Loading...</div>
+
+  return (
+    <div className="container mx-auto py-6 space-y-8">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+            <Badge>{project.project_type}</Badge>
+          </div>
+          <p className="text-muted-foreground">{project.description}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <Settings className="mr-2 h-4 w-4" /> Settings
+          </Button>
+          <Button>
+            <ImageIcon className="mr-2 h-4 w-4" /> Upload Data
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="annotate">Annotate</TabsTrigger>
+          <TabsTrigger value="dataset">Dataset</TabsTrigger>
+          <TabsTrigger value="train">Train</TabsTrigger>
+          <TabsTrigger value="deploy">Deploy</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Images</CardTitle>
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.total_images || 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annotated</CardTitle>
+                <Tag className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.annotated_images || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats?.total_images ? Math.round((stats.annotated_images / stats.total_images) * 100) : 0}% coverage
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Annotations</CardTitle>
+                <Layers className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.total_annotations || 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Classes</CardTitle>
+                <Brain className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{project.classes.length}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Class Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="pl-2">
+                {/* Chart placeholder */}
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  Chart Component Here
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-8">
+                  {/* Activity items */}
+                  <div className="flex items-center">
+                    <div className="ml-4 space-y-1">
+                      <p className="text-sm font-medium leading-none">Project Created</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="annotate">
+            <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold">Annotation Tool</h3>
+                    <p className="text-muted-foreground">Select an image to start annotating.</p>
+                    <Button className="mt-4" variant="secondary">Open Annotator</Button>
+                </div>
+            </div>
+        </TabsContent>
+
+        <TabsContent value="dataset">
+            <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold">Dataset Management</h3>
+                    <p className="text-muted-foreground">Generate versions and export data.</p>
+                </div>
+            </div>
+        </TabsContent>
+
+        <TabsContent value="train">
+            <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold">Training</h3>
+                    <p className="text-muted-foreground">Configure and start training jobs.</p>
+                </div>
+            </div>
+        </TabsContent>
+
+        <TabsContent value="deploy">
+            <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold">Deployment</h3>
+                    <p className="text-muted-foreground">Test your model with inference API.</p>
+                </div>
+            </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
