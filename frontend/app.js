@@ -211,6 +211,16 @@ function navigateTo(view, data = null) {
     document.getElementById(`view-${view}`).classList.add('active');
     
     state.currentView = view;
+
+    // Reset project state if navigating to projects list
+    if (view === 'projects') {
+        state.currentProject = null;
+        loadProjects();
+    } else if (view === 'train') {
+        loadProjectsForTraining();
+    } else if (view === 'deploy') {
+        loadModelsForDeploy();
+    }
     
     // Update title
     const titles = {
@@ -224,15 +234,6 @@ function navigateTo(view, data = null) {
     // Only update page title if element exists (it might be removed in new layout)
     const pageTitle = document.getElementById('page-title');
     if (pageTitle) pageTitle.textContent = titles[view] || view;
-    
-    // View-specific actions
-    if (view === 'projects') {
-        loadProjects();
-    } else if (view === 'train') {
-        loadProjectsForTraining();
-    } else if (view === 'deploy') {
-        loadModelsForDeploy();
-    }
 }
 
 function switchProjectTab(tabId) {
@@ -248,10 +249,7 @@ function switchProjectTab(tabId) {
     
     // Tab specific logic
     if (tabId === 'annotate') {
-        // If no image selected, show empty state
-        if (!state.currentImage) {
-            // Maybe load first image?
-        }
+        loadAnnotationDashboard(state.currentProject.id);
     } else if (tabId === 'train') {
         // Initialize train view inside project context
         initializeProjectTrainView();
@@ -1150,30 +1148,124 @@ async function uploadImagesToProject(datasetId, files) {
     progressContainer.style.display = 'none';
 }
 
-async function loadImagesForAnnotationFlow(projectId) {
-    // Fetch datasets
+async function loadAnnotationDashboard(projectId) {
     try {
+        // Fetch all datasets for the project
         const res = await fetch(`${API_BASE}/projects/${projectId}/datasets`);
         const datasets = await res.json();
         
-        if (datasets.length === 0) {
-            showToast('No datasets found. Please upload images first.', 'warning');
-            switchProjectTab('upload');
-            return;
+        // Flatten images from all datasets (or just pick the main one for now)
+        // Ideally we should have an endpoint to get all images for a project with their status
+        // For now, let's load images from the first dataset if available
+        let allImages = [];
+        if (datasets.length > 0) {
+            // Load images from the first dataset (usually 'train' or 'default')
+            // We might need to load from all datasets if they are split
+            // For simplicity, let's assume we work with the first one for annotation flow
+            const imagesRes = await fetch(`${API_BASE}/datasets/${datasets[0].id}/images`);
+            allImages = await imagesRes.json();
+            state.currentDataset = datasets[0].id;
         }
         
-        // Load images from first dataset
-        await loadImages(datasets[0].id);
+        state.images = allImages;
+        populateAnnotateDashboard(allImages);
         
-        // Switch to annotate view
-        navigateTo('annotate');
-        // Load first image
-        if (state.images.length > 0) {
-            loadImageForAnnotation(0);
-        }
     } catch (e) {
         console.error(e);
-        showToast('Failed to load images for annotation', 'error');
+        showToast('Failed to load annotation dashboard', 'error');
+    }
+}
+
+function populateAnnotateDashboard(images) {
+    const unassignedCol = document.getElementById('col-unassigned');
+    const annotatingCol = document.getElementById('col-annotating');
+    const datasetCol = document.getElementById('col-dataset');
+    
+    if (!unassignedCol || !annotatingCol || !datasetCol) return;
+    
+    // Clear columns (keep headers/static content if possible, but here we replace content)
+    // Actually, the HTML structure has static content like "Upload CTA". 
+    // We should append or replace specific lists.
+    // Let's rebuild the content based on the HTML structure we defined.
+    
+    // Filter images
+    const unassigned = images.filter(img => !img.is_annotated);
+    const annotating = images.filter(img => img.is_annotated); // Simplified logic
+    const dataset = []; // Images that are "done" - for now same as annotating or separate logic
+    
+    // Update counts
+    document.getElementById('count-unassigned').textContent = `${unassigned.length} Images`;
+    document.getElementById('count-annotating').textContent = `${annotating.length} Images`;
+    document.getElementById('count-dataset').textContent = `${dataset.length} Images`;
+    
+    // Render Unassigned
+    let unassignedHtml = `
+        <div class="upload-cta" onclick="switchProjectTab('upload')">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <span>Upload More Images</span>
+        </div>
+    `;
+    
+    if (unassigned.length > 0) {
+        unassignedHtml += `
+            <div class="job-card" onclick="startAnnotationBatch()">
+                <div class="job-header">
+                    <h4>Batch #${new Date().toLocaleDateString()}</h4>
+                    <span class="badge badge-new">New</span>
+                </div>
+                <div class="job-stats">
+                    <span>${unassigned.length} images</span>
+                    <span>Unassigned</span>
+                </div>
+                <button class="btn btn-sm btn-primary btn-block" style="margin-top: 8px;">Start Annotating</button>
+            </div>
+        `;
+    }
+    unassignedCol.innerHTML = unassignedHtml;
+    
+    // Render Annotating
+    if (annotating.length === 0) {
+        annotatingCol.innerHTML = `
+            <div class="empty-column-state">
+                <p>No images in progress.</p>
+            </div>
+        `;
+    } else {
+        annotatingCol.innerHTML = annotating.map((img, idx) => `
+            <div class="job-card" onclick="openAnnotationView(${state.images.indexOf(img)})">
+                <div class="job-header">
+                    <h4>${escapeHtml(img.filename)}</h4>
+                    <span class="badge badge-progress">In Progress</span>
+                </div>
+                <div class="job-stats">
+                    <span>${img.annotation_count || 0} annotations</span>
+                </div>
+                <div class="progress-bar-sm">
+                    <div class="progress-fill" style="width: 50%"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Render Dataset
+    datasetCol.innerHTML = `
+        <div class="view-all-link">
+            <i class="fas fa-images"></i>
+            <span>See all images</span>
+        </div>
+        <div class="empty-column-state">
+            <p>Finished images will appear here.</p>
+        </div>
+    `;
+}
+
+function startAnnotationBatch() {
+    // Find first unassigned image
+    const index = state.images.findIndex(img => !img.is_annotated);
+    if (index !== -1) {
+        openAnnotationView(index);
+    } else {
+        showToast('No unassigned images found', 'info');
     }
 }
 
@@ -1534,6 +1626,154 @@ function initAnnotationTools() {
     
     // Floating Class Panel
     initFloatingClassPanel();
+
+    // Back Button
+    const btnBack = document.getElementById('btn-back-to-project');
+    if (btnBack) {
+        btnBack.onclick = () => {
+            navigateTo('project-detail');
+            switchProjectTab('annotate');
+        };
+    }
+
+    // Finish Button
+    const btnFinish = document.getElementById('btn-finish-annotation');
+    if (btnFinish) {
+        btnFinish.onclick = async () => {
+            await saveAnnotations();
+            // Open Add to Dataset Modal instead of finishing immediately
+            openAddToDatasetModal();
+        };
+    }
+}
+
+function openAddToDatasetModal() {
+    const modal = document.getElementById('modal-add-to-dataset');
+    if (!modal) return;
+    
+    // Reset values
+    const totalImages = 1; // Currently we only annotate 1 image at a time in this flow
+    document.getElementById('add-count-labeled').textContent = totalImages;
+    document.getElementById('btn-add-count').textContent = totalImages;
+    
+    // Initialize slider logic
+    initAddToDatasetSlider(totalImages);
+    
+    openModal('modal-add-to-dataset');
+}
+
+function initAddToDatasetSlider(totalImages) {
+    const handle1 = document.getElementById('handle-1');
+    const handle2 = document.getElementById('handle-2');
+    const trackTrain = document.getElementById('track-train');
+    const trackValid = document.getElementById('track-valid');
+    const trackTest = document.getElementById('track-test');
+    
+    // Initial values (70/20/10)
+    let split1 = 70;
+    let split2 = 90;
+    
+    const updateUI = () => {
+        const trainPct = split1;
+        const validPct = split2 - split1;
+        const testPct = 100 - split2;
+        
+        // Update percentages
+        document.getElementById('add-pct-train').textContent = `${Math.round(trainPct)}%`;
+        document.getElementById('add-pct-valid').textContent = `${Math.round(validPct)}%`;
+        document.getElementById('add-pct-test').textContent = `${Math.round(testPct)}%`;
+        
+        // Update track widths
+        trackTrain.style.width = `${trainPct}%`;
+        trackValid.style.width = `${validPct}%`;
+        trackTest.style.width = `${testPct}%`;
+        
+        // Update handles
+        handle1.style.left = `${split1}%`;
+        handle2.style.left = `${split2}%`;
+        
+        // Update counts (simple distribution for now)
+        // For 1 image, it goes to the largest bucket
+        let trainCount = 0, validCount = 0, testCount = 0;
+        
+        if (totalImages === 1) {
+            if (trainPct >= validPct && trainPct >= testPct) trainCount = 1;
+            else if (validPct >= trainPct && validPct >= testPct) validCount = 1;
+            else testCount = 1;
+        } else {
+            trainCount = Math.round(totalImages * (trainPct / 100));
+            validCount = Math.round(totalImages * (validPct / 100));
+            testCount = totalImages - trainCount - validCount;
+        }
+        
+        document.getElementById('add-count-train').textContent = `Train: ${trainCount} images`;
+        document.getElementById('add-count-valid').textContent = `Valid: ${validCount} images`;
+        document.getElementById('add-count-test').textContent = `Test: ${testCount} images`;
+    };
+    
+    // Drag logic
+    const setupDrag = (handle, isHandle1) => {
+        handle.onmousedown = (e) => {
+            e.preventDefault();
+            const sliderWidth = handle.parentElement.parentElement.offsetWidth;
+            
+            document.onmousemove = (moveEvent) => {
+                const rect = handle.parentElement.parentElement.getBoundingClientRect();
+                let x = moveEvent.clientX - rect.left;
+                let pct = Math.max(0, Math.min(100, (x / sliderWidth) * 100));
+                
+                if (isHandle1) {
+                    split1 = Math.min(pct, split2 - 5); // Min 5% gap
+                } else {
+                    split2 = Math.max(pct, split1 + 5); // Min 5% gap
+                }
+                updateUI();
+            };
+            
+            document.onmouseup = () => {
+                document.onmousemove = null;
+                document.onmouseup = null;
+            };
+        };
+    };
+    
+    setupDrag(handle1, true);
+    setupDrag(handle2, false);
+    
+    updateUI();
+    
+    // Confirm button
+    const btnConfirm = document.getElementById('btn-confirm-add-dataset');
+    btnConfirm.onclick = async () => {
+        // Determine target split for single image
+        const trainPct = split1;
+        const validPct = split2 - split1;
+        const testPct = 100 - split2;
+        
+        let targetSplit = 'train';
+        if (totalImages === 1) {
+            if (trainPct >= validPct && trainPct >= testPct) targetSplit = 'train';
+            else if (validPct >= trainPct && validPct >= testPct) targetSplit = 'valid';
+            else targetSplit = 'test';
+        }
+
+        showLoading('Adding to dataset...');
+        try {
+            // Here we would call the API to move the image to the dataset with the split
+            // For now, we just simulate it
+            await new Promise(r => setTimeout(r, 500));
+            
+            closeModal('modal-add-to-dataset');
+            showToast(`Image added to ${targetSplit} set`, 'success');
+            
+            // Return to dashboard
+            navigateTo('project-detail');
+            switchProjectTab('annotate');
+        } catch (error) {
+            showToast('Failed to add to dataset', 'error');
+        }
+        hideLoading();
+    };
 }
 
 function initFloatingClassPanel() {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VisionLab - Computer Vision Platform</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/modal-styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -216,12 +217,49 @@
 
                             <!-- Annotate Tab (Integrated) -->
                             <div class="tab-content" id="tab-annotate">
-                                <div class="annotate-wrapper" id="annotate-wrapper">
-                                    <!-- Annotation tool will be injected here or shown here -->
-                                    <div class="empty-state">
-                                        <i class="fas fa-crop-alt"></i>
-                                        <h3>Select an image to start annotating</h3>
-                                        <button class="btn btn-primary" id="btn-start-annotation-flow">Open Annotator</button>
+                                <div class="annotate-dashboard">
+                                    <div class="dashboard-column">
+                                        <div class="column-header">
+                                            <h3>Unassigned</h3>
+                                            <span class="badge" id="count-unassigned">0 Batches</span>
+                                            <i class="far fa-question-circle"></i>
+                                        </div>
+                                        <div class="column-content" id="col-unassigned">
+                                            <div class="upload-cta">
+                                                <i class="fas fa-cloud-upload-alt"></i>
+                                                <span>Upload More Images</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="dashboard-column">
+                                        <div class="column-header">
+                                            <h3>Annotating</h3>
+                                            <span class="badge" id="count-annotating">0 Jobs</span>
+                                            <i class="far fa-question-circle"></i>
+                                        </div>
+                                        <div class="column-content" id="col-annotating">
+                                            <div class="empty-column-state">
+                                                <p>Upload and assign images to an annotator.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="dashboard-column">
+                                        <div class="column-header">
+                                            <h3>Dataset</h3>
+                                            <span class="badge" id="count-dataset">0 Jobs</span>
+                                            <i class="far fa-question-circle"></i>
+                                        </div>
+                                        <div class="column-content" id="col-dataset">
+                                            <div class="view-all-link">
+                                                <i class="fas fa-images"></i>
+                                                <span>See all images</span>
+                                            </div>
+                                            <div id="dataset-jobs-list">
+                                                <!-- Jobs injected here -->
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -244,21 +282,10 @@
                                 </div>
                                 
                                 <div class="dataset-versions" id="dataset-versions-list">
-                                    <!-- Versions list -->
-                                    <div class="version-card">
-                                        <div class="version-header">
-                                            <h3>v1 (Latest)</h3>
-                                            <span class="date">Just now</span>
-                                        </div>
-                                        <div class="version-stats">
-                                            <span>120 Images</span>
-                                            <span>•</span>
-                                            <span>Augmented</span>
-                                        </div>
-                                        <div class="version-actions">
-                                            <button class="btn btn-sm btn-secondary">Export</button>
-                                            <button class="btn btn-sm btn-primary">Train with this</button>
-                                        </div>
+                                    <!-- Versions list will be loaded here -->
+                                    <div class="empty-state" style="padding: 30px;">
+                                        <i class="fas fa-code-branch" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                                        <p>No dataset versions generated yet.</p>
                                     </div>
                                 </div>
                             </div>
@@ -299,7 +326,7 @@
                             <div class="sidebar-tab-content active" id="sidebar-classes">
                                 <div class="classes-panel">
                                     <div class="annotation-classes" id="annotation-classes">
-                                        <!-- Classes will be loaded here -->
+                                        <!-- classes will be loaded here -->
                                     </div>
                                 </div>
                                 
@@ -333,6 +360,10 @@
                         <div class="annotate-main">
                             <div class="annotate-toolbar">
                                 <div class="nav-buttons">
+                                    <button class="btn btn-secondary" id="btn-back-to-project" title="Back to Project">
+                                        <i class="fas fa-arrow-left"></i> Back
+                                    </button>
+                                    <div class="divider-vertical"></div>
                                     <button class="btn btn-icon" id="btn-prev-image" title="Previous (A)">
                                         <i class="fas fa-chevron-left"></i>
                                     </button>
@@ -341,6 +372,9 @@
                                     </span>
                                     <button class="btn btn-icon" id="btn-next-image" title="Next (D)">
                                         <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                    <button class="btn btn-success btn-icon" id="btn-finish-annotation" title="Finish & Split Data" style="margin-left: 10px; color: var(--success);">
+                                        <i class="fas fa-check"></i>
                                     </button>
                                 </div>
                                 <div class="zoom-controls">
@@ -372,26 +406,26 @@
                             </div>
                             <div class="canvas-container" id="canvas-container">
                                 <canvas id="annotation-canvas"></canvas>
+                                
+                                <!-- Floating Editor -->
                                 <div class="floating-editor" id="floating-editor">
                                     <div class="editor-header">
                                         <span>Annotation Editor</span>
                                         <div class="editor-controls">
-                                            <button class="btn-icon small"><i class="fas fa-ellipsis-v"></i></button>
-                                            <button class="btn-icon small" id="btn-close-editor"><i class="fas fa-times"></i></button>
+                                            <button class="btn-icon-sm"><i class="fas fa-ellipsis-v"></i></button>
+                                            <button class="btn-icon-sm close-editor" id="btn-close-editor"><i class="fas fa-times"></i></button>
                                         </div>
                                     </div>
                                     <div class="editor-body">
-                                        <input type="text" id="editor-class-input" placeholder="Class name">
+                                        <input type="text" id="editor-class-input" placeholder="Class name" autocomplete="off">
                                         <div class="editor-actions">
-                                            <button class="btn btn-danger small" id="btn-editor-delete">Delete</button>
-                                            <button class="btn btn-success small" id="btn-editor-save">Save (Enter)</button>
+                                            <button class="btn-editor-delete" id="btn-editor-delete">Delete</button>
+                                            <button class="btn-editor-save" id="btn-editor-save">Save (Enter)</button>
                                         </div>
-                                    </div>
-                                    <div class="editor-footer">
-                                        <div class="class-indicator" id="editor-class-indicator">
-                                            <span class="key-hint">1</span>
-                                            <span class="class-name">character</span>
-                                            <div class="class-dot"></div>
+                                        <div class="editor-current-class" id="editor-current-class-display">
+                                            <span class="key-hint" id="editor-class-id">1</span>
+                                            <span class="class-name" id="editor-class-name">character</span>
+                                            <div class="class-dot" id="editor-class-color"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -862,6 +896,84 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
                 <button type="button" class="btn btn-primary" id="btn-confirm-split">Apply Split</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-add-to-dataset">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-images"></i> Add Images To Dataset</h2>
+                <button class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="add-summary-box">
+                    <div class="summary-icon">
+                        <i class="fas fa-images"></i>
+                    </div>
+                    <div class="summary-details">
+                        <div class="summary-row">
+                            <span class="summary-label">Labeled Images to Add</span>
+                            <span class="summary-value" id="add-count-labeled">1</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Remaining Batch Images</span>
+                            <span class="summary-value" id="add-count-remaining">0</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted text-center text-sm" style="margin-bottom: 20px;">Your remaining images will be split into a new batch.</p>
+                
+                <div class="form-group">
+                    <label>Method <i class="far fa-question-circle text-muted"></i></label>
+                    <select class="form-control" disabled>
+                        <option>Split Images Between Train/Valid/Test</option>
+                    </select>
+                </div>
+
+                <div class="distribution-section">
+                    <label>Distribution</label>
+                    <div class="split-badges">
+                        <span class="split-badge train"><i class="fas fa-running"></i> Train</span>
+                        <span class="split-badge valid"><i class="fas fa-check-circle"></i> Valid</span>
+                        <span class="split-badge test"><i class="fas fa-vial"></i> Test</span>
+                    </div>
+                    <div class="split-percentages">
+                        <span class="split-pct train" id="add-pct-train">70%</span>
+                        <span class="split-pct valid" id="add-pct-valid">20%</span>
+                        <span class="split-pct test" id="add-pct-test">10%</span>
+                    </div>
+                    
+                    <div class="multi-range-slider">
+                        <!-- Simulated multi-range slider -->
+                        <input type="range" id="add-split-train" min="0" max="100" value="70">
+                        <input type="range" id="add-split-valid" min="0" max="100" value="20">
+                        <!-- Test is calculated -->
+                        <div class="slider-track">
+                            <div class="track-segment train" id="track-train" style="width: 70%"></div>
+                            <div class="track-segment valid" id="track-valid" style="width: 20%"></div>
+                            <div class="track-segment test" id="track-test" style="width: 10%"></div>
+                        </div>
+                        <div class="slider-handles">
+                            <div class="slider-handle" id="handle-1" style="left: 70%"></div>
+                            <div class="slider-handle" id="handle-2" style="left: 90%"></div>
+                        </div>
+                    </div>
+
+                    <div class="split-counts">
+                        <span class="split-count train" id="add-count-train">Train: 1 images</span>
+                        <span class="split-count valid" id="add-count-valid">Valid: 0 images</span>
+                        <span class="split-count test" id="add-count-test">Test: 0 images</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button type="button" class="btn btn-secondary btn-outline">
+                    <i class="fas fa-lock"></i> Submit for Review
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-add-dataset">
+                    Add <span id="btn-add-count">1</span> Image
+                </button>
             </div>
         </div>
     </div>
