@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionLab - Computer Vision Platform</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-eye"></i>
+                <span>VisionLab</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="projects">
+                    <i class="fas fa-folder"></i>
+                    <span>Projects</span>
+                </a>
+                <a href="#" class="nav-item" data-view="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <span class="status-dot online"></span>
+                    <span>System Ready</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="page-title">Projects</h1>
+                    <div class="breadcrumb" id="breadcrumb"></div>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-icon" id="btn-notifications">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button class="btn btn-icon" id="btn-help">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="content-area" id="content-area">
+                <!-- Projects View -->
+                <div class="view active" id="view-projects">
+                    <div class="view-header">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" placeholder="Search projects..." id="project-search">
+                        </div>
+                        <button class="btn btn-primary" id="btn-new-project">
+                            <i class="fas fa-plus"></i>
+                            New Project
+                        </button>
+                    </div>
+                    <div class="projects-grid" id="projects-grid">
+                        <!-- Projects will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Project Detail View -->
+                <div class="view" id="view-project-detail">
+                    <div class="project-layout">
+                        <!-- Project Sidebar -->
+                        <div class="project-sidebar">
+                            <div class="project-sidebar-header">
+                                <div class="project-icon">
+                                    <i class="fas fa-cube"></i>
+                                </div>
+                                <div class="project-title-box">
+                                    <h2 id="project-name">Project Name</h2>
+                                    <span class="project-type-badge" id="project-type-badge">Object Detection</span>
+                                </div>
+                            </div>
+                            
+                            <nav class="project-nav">
+                                <div class="nav-section">
+                                    <h3>Project</h3>
+                                    <a href="#" class="project-nav-item active" data-tab="overview">
+                                        <i class="fas fa-home"></i> Overview
+                                    </a>
+                                    <a href="#" class="project-nav-item" data-tab="upload">
+                                        <i class="fas fa-upload"></i> Upload
+                                    </a>
+                                    <a href="#" class="project-nav-item" data-tab="annotate">
+                                        <i class="fas fa-tag"></i> Annotate
+                                    </a>
+                                    <a href="#" class="project-nav-item" data-tab="dataset">
+                                        <i class="fas fa-layer-group"></i> Dataset
+                                    </a>
+                                </div>
+                                
+                                <div class="nav-section">
+                                    <h3>Model</h3>
+                                    <a href="#" class="project-nav-item" data-tab="train">
+                                        <i class="fas fa-brain"></i> Train
+                                    </a>
+                                    <a href="#" class="project-nav-item" data-tab="deploy">
+                                        <i class="fas fa-rocket"></i> Deploy
+                                    </a>
+                                </div>
+
+                                <div class="nav-section">
+                                    <h3>Settings</h3>
+                                    <a href="#" class="project-nav-item" data-tab="settings">
+                                        <i class="fas fa-cog"></i> Settings
+                                    </a>
+                                </div>
+                            </nav>
+                        </div>
+
+                        <!-- Project Content -->
+                        <div class="project-content">
+                            <!-- Overview Tab -->
+                            <div class="tab-content active" id="tab-overview">
+                                <div class="content-header">
+                                    <h1>Project Overview</h1>
+                                    <p id="project-description">Project description goes here...</p>
+                                </div>
+                                
+                                <div class="stats-grid">
+                                    <div class="stat-card">
+                                        <div class="stat-icon"><i class="fas fa-images"></i></div>
+                                        <div class="stat-info">
+                                            <span class="stat-value" id="stat-total-images">0</span>
+                                            <span class="stat-label">Total Images</span>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                                        <div class="stat-info">
+                                            <span class="stat-value" id="stat-annotated-images">0</span>
+                                            <span class="stat-label">Annotated</span>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-icon"><i class="fas fa-tags"></i></div>
+                                        <div class="stat-info">
+                                            <span class="stat-value" id="stat-total-annotations">0</span>
+                                            <span class="stat-label">Annotations</span>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                                        <div class="stat-info">
+                                            <span class="stat-value" id="stat-total-classes">0</span>
+                                            <span class="stat-label">Classes</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="charts-container">
+                                    <div class="chart-card">
+                                        <h3>Class Distribution</h3>
+                                        <canvas id="chart-class-distribution"></canvas>
+                                    </div>
+                                    <div class="chart-card">
+                                        <h3>Dataset Split</h3>
+                                        <canvas id="chart-split-distribution"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <div class="recent-activity">
+                                    <h3>Recent Images</h3>
+                                    <div class="images-grid" id="overview-images-grid">
+                                        <!-- Recent images loaded here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Upload Tab (Moved from Modal) -->
+                            <div class="tab-content" id="tab-upload">
+                                <div class="content-header">
+                                    <h1>Upload Data</h1>
+                                    <p>Add images and annotations to your project.</p>
+                                </div>
+                                
+                                <div class="upload-container">
+                                    <div class="upload-zone" id="project-upload-zone">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <h3>Drag & Drop Images</h3>
+                                        <p>or click to browse</p>
+                                        <input type="file" id="project-file-input" accept="image/*" multiple hidden>
+                                    </div>
+                                    
+                                    <div class="upload-settings">
+                                        <!-- Split selection removed as per user request -->
+                                        <p class="text-muted">Images will be added to the dataset and can be split later.</p>
+                                    </div>
+
+                                    <div class="upload-progress" id="project-upload-progress" style="display: none;">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="project-upload-progress-fill"></div>
+                                        </div>
+                                        <span id="project-upload-progress-text">0%</span>
+                                    </div>
+                                    
+                                    <button class="btn btn-primary btn-lg" id="btn-project-upload-start" style="display: none;">
+                                        Start Upload
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Annotate Tab (Integrated) -->
+                            <div class="tab-content" id="tab-annotate">
+                                <div class="annotate-wrapper" id="annotate-wrapper">
+                                    <!-- Annotation tool will be injected here or shown here -->
+                                    <div class="empty-state">
+                                        <i class="fas fa-crop-alt"></i>
+                                        <h3>Select an image to start annotating</h3>
+                                        <button class="btn btn-primary" id="btn-start-annotation-flow">Open Annotator</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dataset Tab -->
+                            <div class="tab-content" id="tab-dataset">
+                                <div class="content-header">
+                                    <div class="header-text">
+                                        <h1>Dataset Management</h1>
+                                        <p>Manage your dataset versions and exports.</p>
+                                    </div>
+                                    <div class="header-actions">
+                                        <button class="btn btn-secondary" id="btn-open-split-modal">
+                                            <i class="fas fa-balance-scale"></i> Rebalance Split
+                                        </button>
+                                        <button class="btn btn-primary" id="btn-generate-version">
+                                            <i class="fas fa-code-branch"></i> Generate Version
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="dataset-versions" id="dataset-versions-list">
+                                    <!-- Versions list -->
+                                    <div class="version-card">
+                                        <div class="version-header">
+                                            <h3>v1 (Latest)</h3>
+                                            <span class="date">Just now</span>
+                                        </div>
+                                        <div class="version-stats">
+                                            <span>120 Images</span>
+                                            <span>•</span>
+                                            <span>Augmented</span>
+                                        </div>
+                                        <div class="version-actions">
+                                            <button class="btn btn-sm btn-secondary">Export</button>
+                                            <button class="btn btn-sm btn-primary">Train with this</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Train Tab (Integrated) -->
+                            <div class="tab-content" id="tab-train">
+                                <!-- Will reuse the train view content here dynamically or duplicate structure -->
+                                <div id="project-train-container"></div>
+                            </div>
+
+                            <!-- Deploy Tab (Integrated) -->
+                            <div class="tab-content" id="tab-deploy">
+                                <div id="project-deploy-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Annotation View (Full Screen Mode) -->
+                <div class="view" id="view-annotate-fullscreen">
+                    <!-- Existing annotation layout -->
+                    <div class="annotate-container">
+                        <!-- ... (Keep existing annotation structure but ensure IDs are unique or reused carefully) ... -->
+                        <!-- I will copy the existing annotation structure here but rename IDs if necessary or just reuse the view -->
+                        <!-- Actually, I'll keep the existing view-annotate and just link to it -->
+                    </div>
+                </div>
+
+                <!-- Annotation View -->
+                <div class="view" id="view-annotate">
+                    <div class="annotate-container">
+                        <div class="annotate-sidebar">
+                            <div class="sidebar-tabs">
+                                <button class="sidebar-tab active" data-tab="classes">Classes</button>
+                                <button class="sidebar-tab" data-tab="layers">Layers</button>
+                            </div>
+                            
+                            <div class="sidebar-tab-content active" id="sidebar-classes">
+                                <div class="classes-panel">
+                                    <div class="annotation-classes" id="annotation-classes">
+                                        <!-- Classes will be loaded here -->
+                                    </div>
+                                </div>
+                                
+                                <div class="unused-classes-panel">
+                                    <h4>Unused Classes</h4>
+                                    <div class="unused-classes-list" id="unused-classes-list">
+                                        <!-- Unused classes -->
+                                    </div>
+                                    <button class="btn btn-outline-primary btn-block" id="btn-find-objects">
+                                        <i class="fas fa-magic"></i> Find Objects with AI
+                                    </button>
+                                </div>
+
+                                <div class="tags-panel">
+                                    <h4>Tags</h4>
+                                    <div class="tags-list">
+                                        <button class="btn-tag-add"><i class="fas fa-tag"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sidebar-tab-content" id="sidebar-layers">
+                                <div class="annotations-panel">
+                                    <h3>Annotations</h3>
+                                    <div class="annotation-list" id="annotation-list">
+                                        <!-- Annotations will be loaded here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="annotate-main">
+                            <div class="annotate-toolbar">
+                                <div class="nav-buttons">
+                                    <button class="btn btn-icon" id="btn-prev-image" title="Previous (A)">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </button>
+                                    <span class="image-counter">
+                                        <span id="current-image-index">0</span> / <span id="total-images">0</span>
+                                    </span>
+                                    <button class="btn btn-icon" id="btn-next-image" title="Next (D)">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                                <div class="zoom-controls">
+                                    <button class="btn btn-icon" id="btn-zoom-out" title="Zoom Out (-)">
+                                        <i class="fas fa-search-minus"></i>
+                                    </button>
+                                    <span id="zoom-level">100%</span>
+                                    <button class="btn btn-icon" id="btn-zoom-in" title="Zoom In (+)">
+                                        <i class="fas fa-search-plus"></i>
+                                    </button>
+                                    <button class="btn btn-icon" id="btn-zoom-fit" title="Fit (F)">
+                                        <i class="fas fa-expand"></i>
+                                    </button>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-warning" id="btn-auto-label" title="Auto-Label with AI">
+                                        <i class="fas fa-magic"></i> Auto-Label
+                                    </button>
+                                    <button class="btn btn-secondary" id="btn-undo" title="Undo (Ctrl+Z)">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                    <button class="btn btn-secondary" id="btn-redo" title="Redo (Ctrl+Y)">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                    <button class="btn btn-primary" id="btn-save-annotations">
+                                        <i class="fas fa-save"></i> Save
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="canvas-container" id="canvas-container">
+                                <canvas id="annotation-canvas"></canvas>
+                                <div class="floating-editor" id="floating-editor">
+                                    <div class="editor-header">
+                                        <span>Annotation Editor</span>
+                                        <div class="editor-controls">
+                                            <button class="btn-icon small"><i class="fas fa-ellipsis-v"></i></button>
+                                            <button class="btn-icon small" id="btn-close-editor"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="editor-body">
+                                        <input type="text" id="editor-class-input" placeholder="Class name">
+                                        <div class="editor-actions">
+                                            <button class="btn btn-danger small" id="btn-editor-delete">Delete</button>
+                                            <button class="btn btn-success small" id="btn-editor-save">Save (Enter)</button>
+                                        </div>
+                                    </div>
+                                    <div class="editor-footer">
+                                        <div class="class-indicator" id="editor-class-indicator">
+                                            <span class="key-hint">1</span>
+                                            <span class="class-name">character</span>
+                                            <div class="class-dot"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="image-browser">
+                            <h3>Images</h3>
+                            <div class="image-thumbnails" id="image-thumbnails">
+                                <!-- Thumbnails will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Train View -->
+                <div class="view" id="view-train">
+                    <div class="train-container">
+                        <div class="train-config">
+                            <h2>Training Configuration</h2>
+                            <form id="train-form">
+                                <div class="form-group">
+                                    <label for="train-project">Project</label>
+                                    <select id="train-project" required>
+                                        <option value="">Select project...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="train-model-name">Model Name</label>
+                                    <input type="text" id="train-model-name" placeholder="my-model-v1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="train-architecture">Architecture</label>
+                                    <select id="train-architecture">
+                                        <optgroup label="YOLOv8">
+                                            <option value="yolov8n">YOLOv8 Nano (fastest)</option>
+                                            <option value="yolov8s">YOLOv8 Small</option>
+                                            <option value="yolov8m">YOLOv8 Medium</option>
+                                            <option value="yolov8l">YOLOv8 Large</option>
+                                            <option value="yolov8x">YOLOv8 XLarge</option>
+                                        </optgroup>
+                                        <optgroup label="YOLOv11">
+                                            <option value="yolov11n">YOLOv11 Nano (fastest)</option>
+                                            <option value="yolov11s">YOLOv11 Small</option>
+                                            <option value="yolov11m">YOLOv11 Medium</option>
+                                            <option value="yolov11l">YOLOv11 Large</option>
+                                            <option value="yolov11x">YOLOv11 XLarge (best YOLO)</option>
+                                        </optgroup>
+                                        <optgroup label="RF-DETR (Transformer)">
+                                            <option value="rf-detr-base">RF-DETR Base</option>
+                                            <option value="rf-detr-large">RF-DETR Large (best accuracy)</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="train-epochs">Epochs</label>
+                                        <input type="number" id="train-epochs" value="100" min="1" max="1000">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="train-batch-size">Batch Size</label>
+                                        <input type="number" id="train-batch-size" value="16" min="1" max="128">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="train-img-size">Image Size</label>
+                                        <select id="train-img-size">
+                                            <option value="320">320</option>
+                                            <option value="416">416</option>
+                                            <option value="512">512</option>
+                                            <option value="640" selected>640</option>
+                                            <option value="1280">1280</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="train-lr">Learning Rate</label>
+                                        <input type="number" id="train-lr" value="0.01" step="0.001" min="0.0001" max="1">
+                                    </div>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="train-use-wsl2">
+                                        Use WSL2 for GPU Acceleration
+                                    </label>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="train-augmentation" checked>
+                                        Enable Data Augmentation
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="train-device">Training Device</label>
+                                    <select id="train-device">
+                                        <option value="auto">Auto (Detect Best)</option>
+                                        <option value="cpu">CPU Only</option>
+                                        <option value="0">GPU 0 (Primary)</option>
+                                        <option value="1">GPU 1</option>
+                                        <option value="0,1">Multi-GPU (0,1)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-play"></i> Start Training
+                                </button>
+                            </form>
+                        </div>
+                        <div class="train-monitor">
+                            <h2>Training Progress</h2>
+                            <div class="training-status" id="training-status">
+                                <div class="status-info">
+                                    <span class="status-badge idle">Idle</span>
+                                </div>
+                            </div>
+                            <div class="training-charts">
+                                <div class="chart-card">
+                                    <h3>Loss</h3>
+                                    <canvas id="chart-loss"></canvas>
+                                </div>
+                                <div class="chart-card">
+                                    <h3>Metrics</h3>
+                                    <canvas id="chart-metrics"></canvas>
+                                </div>
+                            </div>
+                            <div class="training-logs">
+                                <h3>Logs</h3>
+                                <div class="log-container" id="training-logs">
+                                    <!-- Logs will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deploy View -->
+                <div class="view" id="view-deploy">
+                    <div class="deploy-container">
+                        <div class="deploy-sidebar">
+                            <h2>Model Selection</h2>
+                            <select id="deploy-model-select">
+                                <option value="">Select a trained model...</option>
+                            </select>
+                            <div class="model-info" id="deploy-model-info">
+                                <!-- Model info will be displayed here -->
+                            </div>
+                            <h3>Inference Settings</h3>
+                            <div class="form-group">
+                                <label for="deploy-confidence">Confidence Threshold</label>
+                                <input type="range" id="deploy-confidence" min="0" max="1" step="0.05" value="0.25">
+                                <span id="deploy-confidence-value">0.25</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="deploy-iou">IOU Threshold</label>
+                                <input type="range" id="deploy-iou" min="0" max="1" step="0.05" value="0.45">
+                                <span id="deploy-iou-value">0.45</span>
+                            </div>
+                        </div>
+                        <div class="deploy-main">
+                            <div class="deploy-tabs">
+                                <button class="deploy-tab active" data-tab="image">
+                                    <i class="fas fa-image"></i> Image
+                                </button>
+                                <button class="deploy-tab" data-tab="video">
+                                    <i class="fas fa-video"></i> Video
+                                </button>
+                                <button class="deploy-tab" data-tab="webcam">
+                                    <i class="fas fa-camera"></i> Webcam
+                                </button>
+                            </div>
+                            <div class="deploy-content" id="deploy-content">
+                                <!-- Image Tab -->
+                                <div class="deploy-tab-content active" id="deploy-tab-image">
+                                    <div class="upload-zone" id="deploy-upload-zone">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <p>Drag & drop an image or click to upload</p>
+                                        <input type="file" id="deploy-file-input" accept="image/*" hidden>
+                                    </div>
+                                    <div class="inference-result" id="inference-result" style="display: none;">
+                                        <canvas id="inference-canvas"></canvas>
+                                        <div class="detections-panel" id="detections-panel">
+                                            <!-- Detections will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Video Tab -->
+                                <div class="deploy-tab-content" id="deploy-tab-video">
+                                    <div class="upload-zone" id="deploy-video-upload-zone">
+                                        <i class="fas fa-film"></i>
+                                        <p>Drag & drop a video or click to upload</p>
+                                        <input type="file" id="deploy-video-input" accept="video/*" hidden>
+                                    </div>
+                                    <div class="video-result" id="video-result" style="display: none;">
+                                        <video id="video-player" controls></video>
+                                        <canvas id="video-canvas" style="display: none;"></canvas>
+                                        <div class="video-controls">
+                                            <button class="btn btn-primary" id="btn-process-video">
+                                                <i class="fas fa-play"></i> Process Video
+                                            </button>
+                                            <button class="btn btn-secondary" id="btn-stop-video" disabled>
+                                                <i class="fas fa-stop"></i> Stop
+                                            </button>
+                                            <span class="video-progress" id="video-progress">0%</span>
+                                        </div>
+                                        <div class="detections-panel" id="video-detections-panel"></div>
+                                    </div>
+                                </div>
+                                <!-- Webcam Tab -->
+                                <div class="deploy-tab-content" id="deploy-tab-webcam">
+                                    <div class="webcam-container" id="webcam-container">
+                                        <div class="webcam-placeholder" id="webcam-placeholder">
+                                            <i class="fas fa-video"></i>
+                                            <p>Click to start webcam</p>
+                                            <button class="btn btn-primary" id="btn-start-webcam">
+                                                <i class="fas fa-play"></i> Start Webcam
+                                            </button>
+                                        </div>
+                                        <div class="webcam-view" id="webcam-view" style="display: none;">
+                                            <video id="webcam-video" autoplay muted></video>
+                                            <canvas id="webcam-canvas"></canvas>
+                                            <div class="webcam-controls">
+                                                <button class="btn btn-danger" id="btn-stop-webcam">
+                                                    <i class="fas fa-stop"></i> Stop
+                                                </button>
+                                                <button class="btn btn-secondary" id="btn-screenshot">
+                                                    <i class="fas fa-camera"></i> Screenshot
+                                                </button>
+                                                <div class="webcam-stats">
+                                                    <span id="webcam-fps">0 FPS</span>
+                                                    <span id="webcam-detections">0 detections</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="detections-panel" id="webcam-detections-panel"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings View -->
+                <div class="view" id="view-settings">
+                    <div class="settings-container">
+                        <h2>Settings</h2>
+                        <div class="settings-section">
+                            <h3>General</h3>
+                            <div class="setting-item">
+                                <label for="setting-theme">Theme</label>
+                                <select id="setting-theme">
+                                    <option value="dark">Dark</option>
+                                    <option value="light">Light</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-autosave">Auto-save annotations</label>
+                                <input type="checkbox" id="setting-autosave" checked>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3>Performance</h3>
+                            <div class="setting-item">
+                                <label for="setting-device">Training Device</label>
+                                <select id="setting-device">
+                                    <option value="auto">Auto (Detect Best)</option>
+                                    <option value="cpu">CPU Only</option>
+                                    <option value="0">GPU 0 (Primary)</option>
+                                    <option value="1">GPU 1</option>
+                                    <option value="2">GPU 2</option>
+                                    <option value="0,1">Multi-GPU (0,1)</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-wsl2">Enable WSL2 GPU Acceleration</label>
+                                <input type="checkbox" id="setting-wsl2">
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-max-workers">Max Workers</label>
+                                <input type="number" id="setting-max-workers" value="4" min="1" max="16">
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3>Storage Configuration</h3>
+                            <div class="setting-item">
+                                <label for="setting-data-dir">Data Directory</label>
+                                <div class="input-with-button">
+                                    <input type="text" id="setting-data-dir" value="./data" placeholder="./data">
+                                    <button class="btn btn-secondary btn-sm" id="btn-browse-data-dir">
+                                        <i class="fas fa-folder-open"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-models-dir">Models Directory</label>
+                                <div class="input-with-button">
+                                    <input type="text" id="setting-models-dir" value="./data/models" placeholder="./data/models">
+                                    <button class="btn btn-secondary btn-sm" id="btn-browse-models-dir">
+                                        <i class="fas fa-folder-open"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <label for="setting-exports-dir">Exports Directory</label>
+                                <div class="input-with-button">
+                                    <input type="text" id="setting-exports-dir" value="./data/exports" placeholder="./data/exports">
+                                    <button class="btn btn-secondary btn-sm" id="btn-browse-exports-dir">
+                                        <i class="fas fa-folder-open"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" id="btn-save-storage">
+                                <i class="fas fa-save"></i> Save Storage Settings
+                            </button>
+                            <button class="btn btn-secondary" id="btn-clear-cache">
+                                <i class="fas fa-trash"></i> Clear Cache
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="modal-new-project">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Project</h2>
+                <button class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <form id="new-project-form">
+                <div class="form-group">
+                    <label for="project-name-input">Project Name</label>
+                    <input type="text" id="project-name-input" required placeholder="My Project">
+                </div>
+                <div class="form-group">
+                    <label for="project-type-input">Project Type</label>
+                    <select id="project-type-input">
+                        <option value="object_detection">Object Detection</option>
+                        <option value="classification">Classification</option>
+                        <option value="segmentation">Instance Segmentation</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="project-desc-input">Description (optional)</label>
+                    <textarea id="project-desc-input" rows="3" placeholder="Describe your project..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Initial Classes</label>
+                    <div class="class-inputs" id="class-inputs">
+                        <div class="class-input-row">
+                            <input type="text" placeholder="Class name" class="class-name-input">
+                            <input type="color" value="#FF0000" class="class-color-input">
+                            <button type="button" class="btn btn-icon btn-remove-class">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-add-class-input">
+                        <i class="fas fa-plus"></i> Add Class
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-upload">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upload Images</h2>
+                <button class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="upload-dataset">Dataset</label>
+                    <select id="upload-dataset">
+                        <option value="">Select or create dataset...</option>
+                    </select>
+                </div>
+                <div class="form-group" id="new-dataset-form" style="display: none;">
+                    <label for="new-dataset-name">New Dataset Name</label>
+                    <input type="text" id="new-dataset-name" placeholder="train">
+                    <select id="new-dataset-split">
+                        <option value="train">Train</option>
+                        <option value="valid">Validation</option>
+                        <option value="test">Test</option>
+                    </select>
+                </div>
+                <div class="upload-zone" id="image-upload-zone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drag & drop images or click to browse</p>
+                    <input type="file" id="image-file-input" accept="image/*" multiple hidden>
+                </div>
+                <div class="upload-progress" id="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="upload-progress-fill"></div>
+                    </div>
+                    <span id="upload-progress-text">0%</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-start-upload">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-export">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Export Dataset</h2>
+                <button class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-options">
+                    <div class="export-option" data-format="yolo">
+                        <i class="fas fa-file-code"></i>
+                        <h3>YOLO</h3>
+                        <p>YOLOv5/v8 format with data.yaml</p>
+                    </div>
+                    <div class="export-option" data-format="coco">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>COCO</h3>
+                        <p>COCO JSON format</p>
+                    </div>
+                    <div class="export-option" data-format="voc">
+                        <i class="fas fa-file-code"></i>
+                        <h3>Pascal VOC</h3>
+                        <p>XML annotations</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-export">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-split-dataset">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Split Dataset</h2>
+                <button class="btn-close" data-close-modal>&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Rebalance your dataset by randomly assigning images to Train, Validation, and Test sets.</p>
+                <div class="split-sliders">
+                    <div class="split-slider-group">
+                        <label>Train (<span id="split-train-val">70</span>%)</label>
+                        <input type="range" id="split-train" min="0" max="100" value="70">
+                    </div>
+                    <div class="split-slider-group">
+                        <label>Validation (<span id="split-valid-val">20</span>%)</label>
+                        <input type="range" id="split-valid" min="0" max="100" value="20">
+                    </div>
+                    <div class="split-slider-group">
+                        <label>Test (<span id="split-test-val">10</span>%)</label>
+                        <input type="range" id="split-test" min="0" max="100" value="10">
+                    </div>
+                    <div class="split-total">
+                        <span>Total: <span id="split-total-val" class="valid">100</span>%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-split">Apply Split</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Help Button -->
+    <button class="btn-help-floating" id="btn-help-floating" title="Keyboard Shortcuts (?)">
+        <i class="fas fa-keyboard"></i>
+    </button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
