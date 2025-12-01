@@ -238,3 +238,11 @@ class ProjectStats(BaseModel):
     total_annotations: int
     class_distribution: Dict[str, int]
     split_distribution: Dict[str, int]
+
+
+class DistributeImagesRequest(BaseModel):
+    image_ids: List[int]
+    train_split: int = 70
+    valid_split: int = 20
+    test_split: int = 10
+

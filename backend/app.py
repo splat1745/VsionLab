@@ -30,7 +30,8 @@ from backend.schemas import (
     AnnotationCreate, AnnotationResponse, AnnotationBulkSave,
     ModelCreate, ModelResponse, TrainingConfig, TrainingStatus, TrainingLogResponse,
     InferenceRequest, InferenceResponse, Detection,
-    ExportRequest, ExportResponse, AugmentationConfig, ProjectStats
+    ExportRequest, ExportResponse, AugmentationConfig, ProjectStats,
+    DistributeImagesRequest
 )
 from backend.image_utils import ImageProcessor, DataAugmentor
 from backend.export_utils import DatasetExporter
@@ -328,6 +329,20 @@ async def create_dataset(dataset: DatasetCreate, db: AsyncSession = Depends(get_
 
 
 # ============== Images ==============
+@app.get("/api/projects/{project_id}/images", response_model=List[ImageResponse])
+async def list_project_images(
+    project_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """List all images in a project across all datasets"""
+    result = await db.execute(
+        select(Image)
+        .join(Dataset)
+        .where(Dataset.project_id == project_id)
+    )
+    return result.scalars().all()
+
+
 @app.get("/api/datasets/{dataset_id}/images", response_model=List[ImageResponse])
 async def list_images(
     dataset_id: int,
@@ -708,6 +723,96 @@ async def split_dataset(
     }}
 
 
+@app.post("/api/projects/{project_id}/distribute")
+async def distribute_images(
+    project_id: int,
+    request: DistributeImagesRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Distribute specific images to dataset splits"""
+    import random
+    
+    if request.train_split + request.valid_split + request.test_split != 100:
+        raise HTTPException(status_code=400, detail="Splits must sum to 100")
+    
+    # Get or create datasets for each split
+    splits = {'train': request.train_split, 'valid': request.valid_split, 'test': request.test_split}
+    split_datasets = {}
+    
+    for split_name in splits.keys():
+        result = await db.execute(
+            select(Dataset).where(
+                Dataset.project_id == project_id,
+                Dataset.split == split_name
+            )
+        )
+        dataset = result.scalar_one_or_none()
+        
+        if not dataset:
+            dataset = Dataset(
+                project_id=project_id,
+                name=split_name,
+                split=split_name
+            )
+            db.add(dataset)
+            await db.flush()
+            
+            # Create directory
+            dataset_dir = settings.datasets_dir / str(project_id) / str(dataset.id)
+            dataset_dir.mkdir(parents=True, exist_ok=True)
+            
+        split_datasets[split_name] = dataset
+    
+    # Get requested images
+    result = await db.execute(
+        select(Image).where(Image.id.in_(request.image_ids))
+    )
+    images = result.scalars().all()
+    
+    if not images:
+        return {"status": "success", "counts": {"train": 0, "valid": 0, "test": 0}}
+    
+    # Shuffle images
+    random.shuffle(images)
+    
+    # Calculate counts
+    total = len(images)
+    n_train = int(total * (request.train_split / 100))
+    n_valid = int(total * (request.valid_split / 100))
+    # Remaining go to test
+    
+    # Assign images
+    train_imgs = images[:n_train]
+    valid_imgs = images[n_train:n_train + n_valid]
+    test_imgs = images[n_train + n_valid:]
+    
+    # Helper to move image files
+    async def move_images(imgs, target_dataset):
+        target_dir = settings.datasets_dir / str(project_id) / str(target_dataset.id)
+        for img in imgs:
+            if img.dataset_id != target_dataset.id:
+                # Move file
+                old_path = Path(img.filepath)
+                new_path = target_dir / img.filename
+                
+                if old_path.exists():
+                    shutil.move(str(old_path), str(new_path))
+                    img.filepath = str(new_path)
+                    img.dataset_id = target_dataset.id
+    
+    await move_images(train_imgs, split_datasets['train'])
+    await move_images(valid_imgs, split_datasets['valid'])
+    await move_images(test_imgs, split_datasets['test'])
+    
+    await db.commit()
+    
+    return {"status": "success", "counts": {
+        "train": len(train_imgs),
+        "valid": len(valid_imgs),
+        "test": len(test_imgs)
+    }}
+
+
 @app.post("/api/training/start")
 async def start_training(config: TrainingConfig, db: AsyncSession = Depends(get_db)):
     """Start model training"""
@@ -771,54 +876,28 @@ async def start_training(config: TrainingConfig, db: AsyncSession = Depends(get_
     data_yaml_path = os.path.join(export_path, 'data.yaml')
     
     # Update model status
-    model.status = 'training'
+    model.status = 'queued'
     await db.commit()
     
-    # Start training in background
-    async def train_callback(status):
-        # Update database with progress
-        async with SessionLocal() as session:
-            result = await session.execute(select(Model).where(Model.id == config.model_id))
-            m = result.scalar_one_or_none()
-            if m:
-                m.metrics = status.get('metrics', {})
-            await session.commit()
+    # Start training via Celery
+    from backend.tasks import train_model_task
     
     # Determine device
     device = config.device if hasattr(config, 'device') else 'auto'
     
-    # Check if RF-DETR model
-    if model.architecture.startswith('rf-detr'):
-        asyncio.create_task(
-            training_pipeline.train_rfdetr(
-                model_id=config.model_id,
-                data_yaml_path=data_yaml_path,
-                model_variant=model.architecture,
-                epochs=config.epochs,
-                batch_size=config.batch_size,
-                img_size=config.img_size,
-                learning_rate=config.learning_rate,
-                device=device,
-                callback=train_callback
-            )
-        )
-    else:
-        # YOLO training (v8 or v11)
-        asyncio.create_task(
-            training_pipeline.train_yolo(
-                model_id=config.model_id,
-                data_yaml_path=data_yaml_path,
-                model_architecture=model.architecture,
-                epochs=config.epochs,
-                batch_size=config.batch_size,
-                img_size=config.img_size,
-                learning_rate=config.learning_rate,
-                device=device,
-                callback=train_callback
-            )
-        )
+    # Dispatch task
+    task = train_model_task.delay(
+        model_id=config.model_id,
+        data_yaml_path=data_yaml_path,
+        model_architecture=model.architecture,
+        epochs=config.epochs,
+        batch_size=config.batch_size,
+        img_size=config.img_size,
+        learning_rate=config.learning_rate,
+        device=device
+    )
     
-    return {"status": "started", "model_id": config.model_id}
+    return {"status": "queued", "model_id": config.model_id, "job_id": str(task.id)}
 
 
 @app.get("/api/training/{model_id}/status", response_model=TrainingStatus)

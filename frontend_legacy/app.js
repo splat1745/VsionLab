@@ -505,6 +505,10 @@ async function openProject(projectId) {
             fetch(`${API_BASE}/projects/${projectId}/stats`)
         ]);
         
+        if (!projectRes.ok) throw new Error(`Failed to load project: ${projectRes.status}`);
+        if (!datasetsRes.ok) throw new Error(`Failed to load datasets: ${datasetsRes.status}`);
+        if (!statsRes.ok) throw new Error(`Failed to load stats: ${statsRes.status}`);
+        
         state.currentProject = await projectRes.json();
         const datasets = await datasetsRes.json();
         const stats = await statsRes.json();
@@ -535,7 +539,7 @@ async function openProject(projectId) {
             await loadImages(datasets[0].id);
         }
     } catch (error) {
-        showToast('Failed to load project', 'error');
+        showToast(`Failed to load project: ${error.message}`, 'error');
         console.error(error);
     }
     hideLoading();
@@ -903,8 +907,8 @@ function setupProjectEventListeners(projectId) {
                 return;
             }
 
-            // Default to 'train' split as per user request to remove selection UI
-            const split = 'train';
+            // Default to 'unassigned' split so they can be distributed later
+            const split = 'unassigned';
             
             // Find or create dataset for this split
             let targetDataset = state.currentProject.datasets?.find(d => d.split === split);
@@ -1150,22 +1154,25 @@ async function uploadImagesToProject(datasetId, files) {
 
 async function loadAnnotationDashboard(projectId) {
     try {
-        // Fetch all datasets for the project
-        const res = await fetch(`${API_BASE}/projects/${projectId}/datasets`);
-        const datasets = await res.json();
+        // Fetch all datasets for the project to map IDs to splits
+        const datasetsRes = await fetch(`${API_BASE}/projects/${projectId}/datasets`);
+        const datasets = await datasetsRes.json();
         
-        // Flatten images from all datasets (or just pick the main one for now)
-        // Ideally we should have an endpoint to get all images for a project with their status
-        // For now, let's load images from the first dataset if available
-        let allImages = [];
-        if (datasets.length > 0) {
-            // Load images from the first dataset (usually 'train' or 'default')
-            // We might need to load from all datasets if they are split
-            // For simplicity, let's assume we work with the first one for annotation flow
-            const imagesRes = await fetch(`${API_BASE}/datasets/${datasets[0].id}/images`);
-            allImages = await imagesRes.json();
-            state.currentDataset = datasets[0].id;
-        }
+        // Create a map of dataset ID to split name
+        const datasetMap = {};
+        datasets.forEach(ds => {
+            datasetMap[ds.id] = ds.split;
+        });
+        state.datasetMap = datasetMap;
+
+        // Fetch all images for the project
+        const imagesRes = await fetch(`${API_BASE}/projects/${projectId}/images`);
+        const allImages = await imagesRes.json();
+        
+        // Attach split info to images
+        allImages.forEach(img => {
+            img.split = datasetMap[img.dataset_id] || 'unknown';
+        });
         
         state.images = allImages;
         populateAnnotateDashboard(allImages);
@@ -1183,15 +1190,22 @@ function populateAnnotateDashboard(images) {
     
     if (!unassignedCol || !annotatingCol || !datasetCol) return;
     
-    // Clear columns (keep headers/static content if possible, but here we replace content)
-    // Actually, the HTML structure has static content like "Upload CTA". 
-    // We should append or replace specific lists.
-    // Let's rebuild the content based on the HTML structure we defined.
+    // Categorize images
+    // Unassigned: Images in 'unassigned' split (or unknown) that are NOT annotated
+    const unassigned = images.filter(img => 
+        (!img.split || img.split === 'unassigned') && !img.is_annotated
+    );
     
-    // Filter images
-    const unassigned = images.filter(img => !img.is_annotated);
-    const annotating = images.filter(img => img.is_annotated); // Simplified logic
-    const dataset = []; // Images that are "done" - for now same as annotating or separate logic
+    // Annotating: Images that ARE annotated but still in 'unassigned' split
+    // These are "In Progress" or "Ready to Add"
+    const annotating = images.filter(img => 
+        (!img.split || img.split === 'unassigned') && img.is_annotated
+    );
+    
+    // Dataset: Images that are in 'train', 'valid', or 'test' splits
+    const dataset = images.filter(img => 
+        ['train', 'valid', 'test'].includes(img.split)
+    );
     
     // Update counts
     document.getElementById('count-unassigned').textContent = `${unassigned.length} Images`;
@@ -1223,7 +1237,7 @@ function populateAnnotateDashboard(images) {
     }
     unassignedCol.innerHTML = unassignedHtml;
     
-    // Render Annotating
+    // Render Annotating (Ready to Add)
     if (annotating.length === 0) {
         annotatingCol.innerHTML = `
             <div class="empty-column-state">
@@ -1231,32 +1245,68 @@ function populateAnnotateDashboard(images) {
             </div>
         `;
     } else {
-        annotatingCol.innerHTML = annotating.map((img, idx) => `
-            <div class="job-card" onclick="openAnnotationView(${state.images.indexOf(img)})">
+        // Group by batch or just show list? Let's show a "Ready to Add" card if there are any
+        annotatingCol.innerHTML = `
+            <div class="job-card" onclick="openAddToDatasetModal()">
                 <div class="job-header">
-                    <h4>${escapeHtml(img.filename)}</h4>
-                    <span class="badge badge-progress">In Progress</span>
+                    <h4>Ready to Add</h4>
+                    <span class="badge badge-progress" style="background: var(--success); color: white;">${annotating.length} Ready</span>
                 </div>
                 <div class="job-stats">
-                    <span>${img.annotation_count || 0} annotations</span>
+                    <span>${annotating.length} annotated images</span>
+                    <span>Waiting to be added</span>
                 </div>
-                <div class="progress-bar-sm">
-                    <div class="progress-fill" style="width: 50%"></div>
-                </div>
+                <button class="btn btn-sm btn-success btn-block" style="margin-top: 8px;">Add to Dataset</button>
             </div>
-        `).join('');
+            ${annotating.map((img, idx) => `
+                <div class="job-card" onclick="openAnnotationView(${state.images.indexOf(img)})">
+                    <div class="job-header">
+                        <h4>${escapeHtml(img.filename)}</h4>
+                        <span class="badge badge-progress">Annotated</span>
+                    </div>
+                </div>
+            `).join('')}
+        `;
     }
     
-    // Render Dataset
-    datasetCol.innerHTML = `
-        <div class="view-all-link">
-            <i class="fas fa-images"></i>
-            <span>See all images</span>
-        </div>
-        <div class="empty-column-state">
-            <p>Finished images will appear here.</p>
-        </div>
-    `;
+    // Render Dataset (Distributed)
+    if (dataset.length === 0) {
+        datasetCol.innerHTML = `
+            <div class="view-all-link">
+                <i class="fas fa-images"></i>
+                <span>See all images</span>
+            </div>
+            <div class="empty-column-state">
+                <p>Finished images will appear here.</p>
+            </div>
+        `;
+    } else {
+        // Group by split
+        const trainCount = dataset.filter(i => i.split === 'train').length;
+        const validCount = dataset.filter(i => i.split === 'valid').length;
+        const testCount = dataset.filter(i => i.split === 'test').length;
+        
+        datasetCol.innerHTML = `
+            <div class="view-all-link">
+                <i class="fas fa-images"></i>
+                <span>See all images</span>
+            </div>
+            <div class="job-card">
+                <div class="job-header">
+                    <h4>Current Version</h4>
+                    <span class="badge badge-new">v1.0</span>
+                </div>
+                <div class="job-stats">
+                    <span>${dataset.length} total images</span>
+                </div>
+                <div class="split-stats-mini" style="margin-top: 8px; font-size: 0.8rem;">
+                    <span style="color: #8b5cf6">Train: ${trainCount}</span>
+                    <span style="color: #3b82f6">Valid: ${validCount}</span>
+                    <span style="color: #f59e0b">Test: ${testCount}</span>
+                </div>
+            </div>
+        `;
+    }
 }
 
 function startAnnotationBatch() {
@@ -1337,10 +1387,16 @@ function updateStats(stats) {
 }
 
 function renderCharts(stats) {
+    // Initialize charts state if not exists
+    if (!state.charts) state.charts = {};
+
     // Class distribution chart
     const classCtx = document.getElementById('chart-class-distribution');
     if (classCtx) {
-        new Chart(classCtx, {
+        if (state.charts.classDist) {
+            state.charts.classDist.destroy();
+        }
+        state.charts.classDist = new Chart(classCtx, {
             type: 'doughnut',
             data: {
                 labels: Object.keys(stats.class_distribution),
@@ -1364,7 +1420,10 @@ function renderCharts(stats) {
     // Split distribution chart
     const splitCtx = document.getElementById('chart-split-distribution');
     if (splitCtx) {
-        new Chart(splitCtx, {
+        if (state.charts.splitDist) {
+            state.charts.splitDist.destroy();
+        }
+        state.charts.splitDist = new Chart(splitCtx, {
             type: 'bar',
             data: {
                 labels: Object.keys(stats.split_distribution),
@@ -1651,18 +1710,34 @@ function openAddToDatasetModal() {
     const modal = document.getElementById('modal-add-to-dataset');
     if (!modal) return;
     
-    // Reset values
-    const totalImages = 1; // Currently we only annotate 1 image at a time in this flow
+    // Find all annotated images that are not yet in a split (assuming 'unassigned' is the default)
+    // We can check if they are in the 'unassigned' dataset or just check if they are annotated
+    // For now, let's assume we want to add ALL annotated images that are currently loaded
+    // and filter out ones that might already be in a split if we had that info.
+    // Since we don't have explicit split info on the image object in the frontend state easily,
+    // we will rely on the backend to handle moving them.
+    // But we can count how many are annotated.
+    
+    const annotatedImages = state.images.filter(img => 
+        img.is_annotated && (!img.split || img.split === 'unassigned')
+    );
+    const totalImages = annotatedImages.length;
+    
+    if (totalImages === 0) {
+        showToast('No annotated images to add', 'warning');
+        return;
+    }
+
     document.getElementById('add-count-labeled').textContent = totalImages;
     document.getElementById('btn-add-count').textContent = totalImages;
     
     // Initialize slider logic
-    initAddToDatasetSlider(totalImages);
+    initAddToDatasetSlider(totalImages, annotatedImages);
     
     openModal('modal-add-to-dataset');
 }
 
-function initAddToDatasetSlider(totalImages) {
+function initAddToDatasetSlider(totalImages, annotatedImages) {
     const handle1 = document.getElementById('handle-1');
     const handle2 = document.getElementById('handle-2');
     const trackTrain = document.getElementById('track-train');
@@ -1688,22 +1763,19 @@ function initAddToDatasetSlider(totalImages) {
         trackValid.style.width = `${validPct}%`;
         trackTest.style.width = `${testPct}%`;
         
-        // Update handles
+        // Update handle positions
         handle1.style.left = `${split1}%`;
         handle2.style.left = `${split2}%`;
         
-        // Update counts (simple distribution for now)
-        // For 1 image, it goes to the largest bucket
-        let trainCount = 0, validCount = 0, testCount = 0;
+        // Update counts
+        let trainCount = Math.round(totalImages * (trainPct / 100));
+        let validCount = Math.round(totalImages * (validPct / 100));
+        let testCount = totalImages - trainCount - validCount;
         
-        if (totalImages === 1) {
-            if (trainPct >= validPct && trainPct >= testPct) trainCount = 1;
-            else if (validPct >= trainPct && validPct >= testPct) validCount = 1;
-            else testCount = 1;
-        } else {
-            trainCount = Math.round(totalImages * (trainPct / 100));
-            validCount = Math.round(totalImages * (validPct / 100));
-            testCount = totalImages - trainCount - validCount;
+        // Adjust for rounding errors
+        if (trainCount + validCount + testCount !== totalImages) {
+            const diff = totalImages - (trainCount + validCount + testCount);
+            trainCount += diff; // Dump remainder in train
         }
         
         document.getElementById('add-count-train').textContent = `Train: ${trainCount} images`;
@@ -1719,7 +1791,9 @@ function initAddToDatasetSlider(totalImages) {
             
             document.onmousemove = (moveEvent) => {
                 const rect = handle.parentElement.parentElement.getBoundingClientRect();
-                let x = moveEvent.clientX - rect.left;
+                // Calculate relative to the slider track, not the handle itself
+                const trackRect = handle.parentElement.parentElement.getBoundingClientRect();
+                let x = moveEvent.clientX - trackRect.left;
                 let pct = Math.max(0, Math.min(100, (x / sliderWidth) * 100));
                 
                 if (isHandle1) {
@@ -1744,33 +1818,46 @@ function initAddToDatasetSlider(totalImages) {
     
     // Confirm button
     const btnConfirm = document.getElementById('btn-confirm-add-dataset');
-    btnConfirm.onclick = async () => {
-        // Determine target split for single image
-        const trainPct = split1;
-        const validPct = split2 - split1;
-        const testPct = 100 - split2;
+    // Remove old listener to avoid duplicates
+    const newBtn = btnConfirm.cloneNode(true);
+    btnConfirm.parentNode.replaceChild(newBtn, btnConfirm);
+    
+    newBtn.onclick = async () => {
+        const trainPct = Math.round(split1);
+        const validPct = Math.round(split2 - split1);
+        const testPct = Math.round(100 - split2);
         
-        let targetSplit = 'train';
-        if (totalImages === 1) {
-            if (trainPct >= validPct && trainPct >= testPct) targetSplit = 'train';
-            else if (validPct >= trainPct && validPct >= testPct) targetSplit = 'valid';
-            else targetSplit = 'test';
-        }
-
         showLoading('Adding to dataset...');
         try {
-            // Here we would call the API to move the image to the dataset with the split
-            // For now, we just simulate it
-            await new Promise(r => setTimeout(r, 500));
+            const response = await fetch(`${API_BASE}/projects/${state.currentProject.id}/distribute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_ids: annotatedImages.map(img => img.id),
+                    train_split: trainPct,
+                    valid_split: validPct,
+                    test_split: testPct
+                })
+            });
             
+            if (!response.ok) throw new Error('Failed to distribute images');
+            
+            const result = await response.json();
             closeModal('modal-add-to-dataset');
-            showToast(`Image added to ${targetSplit} set`, 'success');
+            showToast(`Added ${totalImages} images to dataset (${result.counts.train} train, ${result.counts.valid} valid, ${result.counts.test} test)`, 'success');
             
             // Return to dashboard
             navigateTo('project-detail');
             switchProjectTab('annotate');
+            
+            // Refresh stats
+            const statsRes = await fetch(`${API_BASE}/projects/${state.currentProject.id}/stats`);
+            const stats = await statsRes.json();
+            updateStats(stats);
+            
         } catch (error) {
             showToast('Failed to add to dataset', 'error');
+            console.error(error);
         }
         hideLoading();
     };

@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/visionlab.db"
     
+    # Redis (WSL2)
+    redis_url: str = "redis://localhost:6379/0"
+    
     class Config:
         env_file = ".env"
         extra = "ignore"
