@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func, delete
 
 from backend.config import get_settings
-from backend.database import get_db, init_db, Project, Dataset, Image, Annotation, ProjectClass, Model, get_database_engine, create_tables, get_session_maker
+from backend.database import Project, Dataset, Image, Annotation, ProjectClass, Model, get_database_engine, create_tables, get_session_maker
 from backend.training import TrainingPipeline
 from backend.inference import InferencePipeline
 from backend.augmentation import DataAugmentor
@@ -57,6 +57,7 @@ dataset_exporter = DatasetExporter(settings.exports_dir)
 # WebSocket connections for real-time updates
 active_connections: Dict[str, List[WebSocket]] = {}
 
+# Database session dependency - defined locally
 async def get_db() -> AsyncSession:
     """Dependency for database session"""
     async with SessionLocal() as session:
@@ -306,6 +307,24 @@ async def list_images(
 
 
 @app.post("/api/datasets/{dataset_id}/upload")
+async def upload_images(
+    dataset_id: int,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload images to dataset"""
+    # Get dataset to find project_id
+    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    dataset_dir = settings.datasets_dir / str(dataset.project_id) / str(dataset_id)
+    dataset_dir.mkdir(parents=True, exist_ok=True)
+    
+    uploaded = []
+    
+    for file in files:
         # Generate unique filename
         ext = Path(file.filename).suffix
         unique_name = f"{uuid.uuid4()}{ext}"

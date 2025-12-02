@@ -1,279 +1,225 @@
 # VisionLab - Local Computer Vision Platform
 
-A full-featured, locally-hosted computer vision platform similar to Roboflow, with support for object detection, classification, and segmentation tasks.
+A locally-hosted, all-in-one computer vision platform replicating Roboflow's core functionalities with distributed training support, multi-user authentication, and modern UI/UX.
 
-![VisionLab](https://img.shields.io/badge/VisionLab-v1.0.0-blue)
-![Python](https://img.shields.io/badge/Python-3.10+-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
-
-## Features
-
-### 🖼️ Dataset Management
-- Upload and organize images into projects and datasets
-- Split datasets into train/validation/test sets
-- Browse images with thumbnails and status indicators
-
-### ✏️ Annotation Tools
-- **Bounding Box**: Draw rectangular annotations for object detection
-- **Polygon**: Create precise polygon annotations for segmentation
-- **Keyboard Shortcuts**: Fast annotation workflow with hotkeys
-- **Undo/Redo**: Full history support
-- **Zoom & Pan**: Navigate large images with ease
-
-### 🎨 Class Management
-- Create and manage object classes
-- Custom colors for each class
-- Class distribution statistics
-
-### 🧠 Model Training
-- **YOLO Architecture**: Support for YOLOv8 (nano to xlarge)
-- **WSL2 GPU Acceleration**: Leverage NVIDIA GPUs through WSL2 for 10-50x faster training
-- **Real-time Progress**: Monitor training with live metrics
-- **Data Augmentation**: Built-in augmentation pipeline
-
-### 🚀 Deployment & Inference
-- Run inference on images
-- Real-time webcam inference
-- Batch processing support
-- Confidence and IOU threshold adjustment
-
-### 📦 Export Formats
-- **YOLO**: YOLOv5/v8 format with data.yaml
-- **COCO**: JSON annotations
-- **Pascal VOC**: XML annotations
-
-## Installation
+## ⚡ Quick Start
 
 ### Prerequisites
-- Python 3.10 or higher
-- NVIDIA GPU (optional, for accelerated training)
-- WSL2 with Ubuntu (optional, for GPU acceleration on Windows)
+- Python 3.9+
+- Node.js 18+
+- Redis (via WSL2 on Windows or native on Linux)
+- CUDA-capable GPU (optional, for training)
 
-### Quick Start
+### Installation
 
-1. **Clone or download the project**:
+1. **Install Dependencies**
    ```bash
-   cd VisionLab
+   python setup.py
+   cd frontend
+   npm install
    ```
 
-2. **Create a virtual environment** (recommended):
+2. **Initialize Shadcn UI** (First time only)
    ```bash
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   # or
-   source venv/bin/activate  # Linux/Mac
+   cd frontend
+   npx -y shadcn@latest init --defaults
+   npx -y shadcn@latest add button input card label select progress tabs dropdown-menu badge alert
    ```
 
-3. **Install dependencies**:
+3. **Create Utils File** (Required - gitignored)
    ```bash
-   pip install -r requirements.txt
+   # Create frontend/lib directory
+   mkdir frontend/lib
+   
+   # Create frontend/lib/utils.ts with:
+   ```
+   ```typescript
+   import { clsx, type ClassValue } from "clsx"
+   import { twMerge } from "tailwind-merge"
+
+   export function cn(...inputs: ClassValue[]) {
+     return twMerge(clsx(inputs))
+   }
    ```
 
-4. **Run the application**:
-   ```bash
-   python main.py
-   ```
+### Running the Application
 
-5. **Open in browser**:
-   Navigate to `http://127.0.0.1:8000`
-
-## WSL2 GPU Setup (Windows)
-
-For maximum training performance on Windows, use WSL2 with GPU passthrough:
-
-1. **Install WSL2 with Ubuntu**:
-   ```powershell
-   wsl --install -d Ubuntu
-   ```
-
-2. **Install NVIDIA drivers for WSL**:
-   Download from [NVIDIA CUDA on WSL](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
-
-3. **Install CUDA toolkit in WSL**:
-   ```bash
-   # In WSL terminal
-   sudo apt update
-   sudo apt install python3-pip
-   pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-   pip3 install ultralytics
-   ```
-
-4. **Enable WSL2 in VisionLab**:
-   - Check "Use WSL2 for GPU Acceleration" in training settings
-   - Or set `USE_WSL2=true` in `.env`
-
-## Project Structure
-
-```
-VisionLab/
-├── main.py                 # Application entry point
-├── requirements.txt        # Python dependencies
-├── .env                    # Configuration
-├── backend/
-│   ├── app.py             # FastAPI application
-│   ├── config.py          # Settings management
-│   ├── database.py        # SQLite database models
-│   ├── schemas.py         # Pydantic schemas
-│   ├── image_utils.py     # Image processing utilities
-│   ├── export_utils.py    # Dataset export utilities
-│   ├── training.py        # Training pipeline
-│   └── wsl2_utils.py      # WSL2 integration
-├── frontend/
-│   ├── index.html         # Main HTML
-│   ├── styles.css         # CSS styles
-│   └── app.js             # JavaScript application
-├── scripts/
-│   └── wsl2_train.sh      # WSL2 training script
-└── data/                   # Data directory (created on startup)
-    ├── datasets/          # Project datasets
-    ├── models/            # Trained models
-    ├── exports/           # Exported datasets
-    └── cache/             # Cached files
+#### Windows
+```batch
+run.bat
 ```
 
-## Usage Guide
+#### Linux / WSL
+```bash
+chmod +x run.sh
+./run.sh
+```
 
-### Creating a Project
+#### Manual Start (All Platforms)
+```bash
+# Terminal 1: Redis (WSL2 on Windows)
+wsl sudo service redis-server start
 
-1. Click "New Project" on the Projects page
-2. Enter project name and description
-3. Select project type (Object Detection, Classification, or Segmentation)
-4. Add initial classes with colors
-5. Click "Create Project"
+# Terminal 2: Celery Worker
+celery -A backend.celery_app worker --loglevel=info -P solo
 
-### Uploading Images
+# Terminal 3: Backend
+uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
 
-1. Open a project
-2. Click "Upload Images"
-3. Select or create a dataset
-4. Drag and drop images or click to browse
-5. Click "Upload"
+# Terminal 4: Frontend
+cd frontend
+npm run dev
+```
 
-### Annotating Images
+## 🌐 Access Points
 
-1. Open a project and click on an image
-2. Select a class from the sidebar
-3. Choose a tool (Bounding Box, Polygon)
-4. Draw annotations on the image
-5. Press Ctrl+S to save
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
 
-**Keyboard Shortcuts:**
-- `V` - Select tool
-- `B` - Bounding box tool
-- `P` - Polygon tool
-- `A` / `D` - Previous/Next image
-- `+` / `-` - Zoom in/out
-- `F` - Fit to view
-- `Ctrl+Z` - Undo
-- `Ctrl+Y` - Redo
-- `Ctrl+S` - Save
-- `Delete` - Delete selected annotation
+## 📁 Backend Structure
 
-### Training a Model
+```
+backend/
+├── app.py              # Main FastAPI application
+├── auth.py             # JWT authentication & API keys
+├── nodes.py            # Training node registry
+├── registry.py         # Model versioning
+├── tasks.py            # Distributed Celery tasks
+├── training.py         # Training pipeline
+├── database.py         # SQLAlchemy models
+├── config.py           # Settings
+└── celery_app.py       # Celery configuration
+```
 
-1. Navigate to the "Train" section
-2. Select a project with annotated data
-3. Choose model architecture (YOLOv8n recommended for speed)
-4. Configure training parameters:
-   - Epochs: 100 (default)
-   - Batch Size: 16 (adjust based on GPU memory)
-   - Image Size: 640 (higher for better accuracy)
-5. Enable WSL2 for GPU acceleration (if available)
-6. Click "Start Training"
+## 💻 Frontend Structure
 
-### Running Inference
+```
+frontend/
+├── app/
+│   ├── page.tsx                    # Dashboard
+│   ├── login/page.tsx              # Login
+│   ├── register/page.tsx           # Registration
+│   ├── universe/page.tsx           # Model Registry
+│   └── projects/[id]/
+│       ├── page.tsx                # Project Overview
+│       ├── train/page.tsx          # Training
+│       └── deploy/page.tsx         # Deployment
+├── components/
+│   ├── auth-provider.tsx           # Auth context
+│   ├── sidebar.tsx                 # Navigation
+│   ├── theme-provider.tsx          # Dark mode
+│   └── ui/                         # Shadcn components (10 files)
+└── lib/
+    └── utils.ts                    # CN utility (create manually)
+```
 
-1. Go to "Deploy" section
-2. Select a trained model
-3. Adjust confidence and IOU thresholds
-4. Upload an image or enable webcam
-5. View detection results
+## 🔑 Features
 
-### Exporting Datasets
+### ✅ Implemented
+- **Multi-User Authentication**: JWT tokens with bcrypt hashing
+- **Distributed Training**: Remote GPU node dispatch with retries
+- **Model Registry**: Version tracking with metrics (mAP, precision, recall)
+- **Node Management**: GPU resource monitoring (VRAM, load, active jobs)
+- **Export**: ONNX, TensorRT, TFLite, TorchScript
+- **Modern UI**: Dark mode, conflict alerts, live progress
+- **Automation**: Setup, startup, and verification scripts
 
-1. Open a project
-2. Click "Export"
-3. Choose format (YOLO, COCO, or Pascal VOC)
-4. Click "Export"
+### ⏳ Pending
+- Annotation interface (Label Studio integration)
+- DVC dataset versioning workflow
+- WebSocket live training logs
+- Database concurrency control (row locking)
 
-## API Documentation
+## 🚀 Usage
 
-The application exposes a REST API for programmatic access:
+### Register & Login
+1. Navigate to http://localhost:3000
+2. Click "Register" to create an account
+3. Login with your credentials
+
+### Create a Project
+1. Click "New Project" on the Dashboard
+2. Enter project name and select type (Object Detection / Classification / Segmentation)
+3. Add classes for your dataset
+
+### Train a Model
+1. Open your project
+2. Navigate to the "Train" tab
+3. Select a training node (local or remote)
+4. Configure training parameters (epochs, batch size, architecture)
+5. Click "Start Training"
+
+### Deploy & Export
+1. Navigate to "Universe" to browse trained models
+2. Select a model and click "Download"
+3. Choose export format (ONNX, TensorRT, etc.)
+4. Use API snippets for inference
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /token` - Login
+- `GET /users/me/` - Current user
 
 ### Projects
-- `GET /api/projects` - List all projects
+- `GET /api/projects` - List projects
 - `POST /api/projects` - Create project
-- `GET /api/projects/{id}` - Get project details
-- `DELETE /api/projects/{id}` - Delete project
+- `GET /api/projects/{id}` - Get project
+- `GET /api/projects/{id}/stats` - Project statistics
 
-### Images
-- `GET /api/datasets/{id}/images` - List images
-- `POST /api/datasets/{id}/upload` - Upload images
-- `GET /api/images/{id}/file` - Get image file
+### Training Nodes
+- `GET /api/nodes/` - List nodes
+- `POST /api/nodes/register` - Register node
+- `POST /api/nodes/{id}/heartbeat` - Update node status
+- `POST /api/nodes/agent/train` - Dispatch training
 
-### Annotations
-- `POST /api/annotations` - Create annotation
-- `POST /api/annotations/bulk` - Save all annotations for image
-- `DELETE /api/annotations/{id}` - Delete annotation
+### Model Registry
+- `GET /api/registry/` - List models
+- `GET /api/registry/{id}` - Get model
+- `POST /api/registry/{id}/promote` - Promote model
 
-### Training
-- `POST /api/training/start` - Start training
-- `GET /api/training/{id}/status` - Get training status
-- `POST /api/training/{id}/stop` - Stop training
+## 🔧 Configuration
 
-### Inference
-- `POST /api/inference/predict` - Run inference on image
+### Environment Variables
+Create a `.env` file (or edit `backend/config.py`):
+```env
+DATABASE_URL=sqlite:///./visionlab.db
+REDIS_URL=redis://localhost:6379/0
+SECRET_KEY=your-secret-key-here
+NODE_API_KEY=your-node-api-key
+```
 
-## Performance Optimization
+### Remote Node Setup
+1. Install dependencies on remote machine
+2. Register node:
+   ```bash
+   curl -X POST http://main-server:8000/api/nodes/register \
+     -H "X-API-Key: your-node-api-key" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"remote-gpu-1","ip_address":"192.168.1.100","has_gpu":true,"gpu_name":"RTX 3090","vram_total":24.0}'
+   ```
+3. Start node agent:
+   ```bash
+   uvicorn backend.app:app --host 0.0.0.0 --port 8000
+   ```
 
-### CPU Training
-- Uses PyTorch with optimized data loading
-- Multi-threaded image preprocessing
-- Automatic mixed precision when available
+## 🐛 Troubleshooting
 
-### GPU Training (WSL2)
-- Full CUDA acceleration through WSL2
-- Automatic batch size optimization
-- TensorRT export for fastest inference
+### Frontend Build Errors
+- **Module not found '@/components/ui/xxx'**: Run `npx shadcn@latest add xxx`
+- **Module not found '@/lib/utils'**: Create `frontend/lib/utils.ts` (see Installation step 3)
 
-### Memory Optimization
-- Lazy image loading
-- Thumbnail caching
-- Automatic garbage collection
+### Backend Errors
+- **Redis connection failed**: Check if Redis is running (`wsl sudo service redis-server status`)
+- **IndentationError in app.py**: File corruption during editing - restore from backup or re-clone
 
-## Troubleshooting
+### Training Issues
+- **No GPU detected**: Ensure CUDA is installed and `nvidia-smi` works
+- **DVC errors**: Initialize with `dvc init` in project root
 
-### "Cannot connect to database"
-- Ensure the `data` directory exists and is writable
-- Delete `data/visionlab.db` to reset the database
+## 📝 License
+MIT
 
-### "CUDA not available in WSL2"
-- Verify NVIDIA drivers are installed on Windows
-- Run `nvidia-smi` in WSL to check GPU access
-- Ensure you're using WSL2 (not WSL1): `wsl --set-version Ubuntu 2`
-
-### "Training is slow"
-- Enable WSL2 GPU acceleration for 10-50x speedup
-- Reduce image size (e.g., 416 instead of 640)
-- Use a smaller model (yolov8n instead of yolov8x)
-- Reduce batch size if running out of memory
-
-### "Out of memory during training"
-- Reduce batch size
-- Use a smaller image size
-- Close other GPU-using applications
-- Try a smaller model architecture
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-## License
-
-MIT License - feel free to use for personal and commercial projects.
-
-## Acknowledgments
-
-- [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) - State-of-the-art object detection
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [Albumentations](https://albumentations.ai/) - Image augmentation library
+## 🙏 Credits
+Built with FastAPI, Next.js, Celery, DVC, and Shadcn UI
