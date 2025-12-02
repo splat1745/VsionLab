@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import axios from "axios"
+import { useAuth } from "@/components/auth-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Image as ImageIcon, Tag, Layers, Brain, Rocket, Settings } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Image as ImageIcon, Tag, Layers, Brain, Rocket, Settings, AlertTriangle } from "lucide-react"
 
 interface Project {
   id: number
@@ -15,7 +17,7 @@ interface Project {
   description: string
   project_type: string
   created_at: string
-  classes: { name: string; color: string }[]
+  classes: { name: string, color: string }[]
 }
 
 interface ProjectStats {
@@ -30,13 +32,19 @@ export default function ProjectOverview() {
   const params = useParams()
   const [project, setProject] = useState<Project | null>(null)
   const [stats, setStats] = useState<ProjectStats | null>(null)
+  const { user, isLoading } = useAuth()
+  const [activeUsers, setActiveUsers] = useState<string[]>([]) // Mock active users
 
   useEffect(() => {
-    if (params.id) {
+    if (user && params.id) {
       fetchProject(Number(params.id))
       fetchStats(Number(params.id))
+      // Mock conflict detection
+      if (Math.random() > 0.7) {
+        setActiveUsers(["alice", "bob"])
+      }
     }
-  }, [params.id])
+  }, [params.id, user])
 
   const fetchProject = async (id: number) => {
     try {
@@ -56,10 +64,21 @@ export default function ProjectOverview() {
     }
   }
 
-  if (!project) return <div className="p-8">Loading...</div>
+  if (isLoading || !project) return <div className="p-8">Loading...</div>
 
   return (
     <div className="container mx-auto py-6 space-y-8">
+      {/* Conflict Alert */}
+      {activeUsers.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Multiple Users Active</AlertTitle>
+          <AlertDescription>
+            Users {activeUsers.join(", ")} are currently viewing this project. Be careful with concurrent edits.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>

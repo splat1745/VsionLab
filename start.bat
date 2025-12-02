@@ -1,44 +1,25 @@
 @echo off
-REM VisionLab - Quick Start Script for Windows
-echo.
-echo ==========================================
-echo         VisionLab - Quick Start
-echo ==========================================
-echo.
+echo Starting VisionLab Platform...
 
-REM Check if Python is installed
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.10 or higher from https://python.org
-    pause
-    exit /b 1
-)
+:: Start Redis in WSL
+echo Starting Redis in WSL...
+wsl sudo service redis-server start
 
-REM Check if virtual environment exists
-if not exist "venv" (
-    echo Creating virtual environment...
-    python -m venv venv
-    echo Virtual environment created.
-)
+:: Start Celery Worker
+echo Starting Celery Worker...
+start "VisionLab Worker" cmd /k "celery -A backend.celery_app worker --loglevel=info --pool=solo"
 
-REM Activate virtual environment
-call venv\Scripts\activate.bat
+:: Start Backend API
+echo Starting FastAPI Backend...
+start "VisionLab API" cmd /k "uvicorn backend.app:app --reload --host 0.0.0.0 --port 8000"
 
-REM Check if dependencies are installed
-python -c "import fastapi" >nul 2>&1
-if errorlevel 1 (
-    echo Installing dependencies...
-    pip install -r requirements.txt
-    if errorlevel 1 (
-        echo ERROR: Failed to install dependencies
-        pause
-        exit /b 1
-    )
-    echo Dependencies installed successfully.
-)
+:: Start Frontend
+echo Starting Next.js Frontend...
+cd frontend
+start "VisionLab Frontend" cmd /k "npm run dev"
+cd ..
 
-echo.
-echo Starting VisionLab...
-echo.
-python main.py
+echo All services launched!
+echo Frontend: http://localhost:3000
+echo Backend: http://localhost:8000/docs
+pause

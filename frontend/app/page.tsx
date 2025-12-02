@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Plus, Search, MoreVertical, Folder, Image as ImageIcon, Tag, Layers } from "lucide-react"
 import axios from "axios"
+import { useAuth } from "@/components/auth-provider"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,24 +28,29 @@ interface Project {
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
+  const [search, setSearch] = useState("")
+  const { user, isLoading } = useAuth()
 
   useEffect(() => {
-    fetchProjects()
-  }, [])
+    if (user) {
+      fetchProjects()
+    }
+  }, [user])
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get("http://localhost:8000/api/projects")
-      setProjects(response.data)
+      const res = await axios.get("http://localhost:8000/api/projects")
+      setProjects(res.data)
     } catch (error) {
-      console.error("Failed to fetch projects:", error)
+      console.error("Failed to fetch projects", error)
     }
   }
 
   const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  if (isLoading) return <div>Loading...</div>
 
   return (
     <div className="container mx-auto py-10">
@@ -64,8 +70,8 @@ export default function Dashboard() {
           <Input 
             placeholder="Search projects..." 
             className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>

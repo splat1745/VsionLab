@@ -8,6 +8,8 @@ aiofiles==23.2.1
 celery==5.3.6
 redis==5.0.1
 dvc==3.30.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
 
 # Computer Vision
 opencv-python-headless==4.8.1.78

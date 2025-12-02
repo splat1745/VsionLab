@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # Redis (WSL2)
     redis_url: str = "redis://localhost:6379/0"
     
+    # Security
+    node_api_key: str = "visionlab-node-secret-key"
+    
     class Config:
         env_file = ".env"
         extra = "ignore"

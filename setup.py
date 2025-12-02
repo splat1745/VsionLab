@@ -1,154 +1,110 @@
-"""
-VisionLab Setup Script
-Checks environment and installs dependencies
-"""
-
 import sys
-import subprocess
 import platform
+import subprocess
+import shutil
+import os
+from pathlib import Path
 
+def print_step(step):
+    print(f"\n{'='*50}\n{step}\n{'='*50}")
 
 def check_python_version():
-    """Check Python version is 3.10+"""
+    print_step("Checking Python Version")
     version = sys.version_info
-    if version.major < 3 or (version.major == 3 and version.minor < 10):
-        print(f"❌ Python 3.10+ required. You have {version.major}.{version.minor}")
-        return False
-    print(f"✓ Python {version.major}.{version.minor}.{version.micro}")
-    return True
+    if version.major < 3 or (version.major == 3 and version.minor < 9):
+        print("Error: Python 3.9+ is required.")
+        sys.exit(1)
+    print(f"Python {version.major}.{version.minor} detected. OK.")
 
-
-def check_pip():
-    """Check pip is available"""
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "--version"], 
-                      capture_output=True, check=True)
-        print("✓ pip is available")
-        return True
-    except subprocess.CalledProcessError:
-        print("❌ pip is not available")
-        return False
-
-
-def install_dependencies():
-    """Install Python dependencies"""
-    print("\nInstalling dependencies...")
-    try:
-        subprocess.run([
-            sys.executable, "-m", "pip", "install", "-r", "requirements.txt"
-        ], check=True)
-        print("✓ Dependencies installed successfully")
-        return True
-    except subprocess.CalledProcessError:
-        print("❌ Failed to install dependencies")
-        return False
-
-
-def check_wsl2():
-    """Check WSL2 availability on Windows"""
-    if platform.system() != "Windows":
-        return None
+def check_gpu():
+    print_step("Checking GPU & CUDA")
     
+    # Check nvidia-smi
     try:
-        result = subprocess.run(
-            ["wsl", "--list", "--verbose"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0 and "Ubuntu" in result.stdout:
-            print("✓ WSL2 with Ubuntu is available")
-            return True
-        else:
-            print("ℹ WSL2 not configured (optional for GPU acceleration)")
-            return False
-    except Exception:
-        print("ℹ WSL2 not available (optional for GPU acceleration)")
-        return False
-
-
-def check_cuda():
-    """Check CUDA availability"""
+        subprocess.run(["nvidia-smi"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print("NVIDIA GPU detected via nvidia-smi. OK.")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("Warning: nvidia-smi not found. GPU acceleration might not work.")
+    
+    # Check PyTorch CUDA
     try:
         import torch
         if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            print(f"✓ CUDA is available - GPU: {gpu_name}")
-            return True
+            print(f"PyTorch CUDA available: {torch.cuda.get_device_name(0)}")
+            print(f"CUDA Version: {torch.version.cuda}")
         else:
-            print("ℹ CUDA not available (training will use CPU)")
-            return False
+            print("Warning: PyTorch cannot detect CUDA. Training will be slow (CPU only).")
     except ImportError:
-        print("ℹ PyTorch not installed yet (CUDA check skipped)")
-        return None
+        print("PyTorch not installed yet. Skipping CUDA check.")
 
+def install_dependencies():
+    print_step("Installing Python Dependencies")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+        print("Dependencies installed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing dependencies: {e}")
+        sys.exit(1)
 
-def create_directories():
-    """Create required directories"""
-    import os
+def setup_dvc():
+    print_step("Setting up DVC")
     
-    dirs = [
-        "data",
-        "data/datasets",
-        "data/models",
-        "data/exports",
-        "data/uploads",
-        "data/cache"
-    ]
+    # Check if DVC is installed
+    if shutil.which("dvc") is None:
+        print("Installing DVC...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "dvc"])
     
-    for d in dirs:
-        os.makedirs(d, exist_ok=True)
+    # Initialize DVC if not already initialized
+    if not os.path.exists(".dvc"):
+        print("Initializing DVC...")
+        subprocess.run(["dvc", "init"], check=True)
+    else:
+        print("DVC already initialized.")
     
-    print("✓ Data directories created")
-    return True
+    # Configure remote (Local shared folder for now, can be changed to S3/SSH)
+    # For cross-machine LAN, we might want a shared network drive or SSH remote
+    # Here we set a placeholder that user should configure
+    print("Note: DVC remote not configured. Run 'dvc remote add -d myremote <path>' to set up shared storage.")
 
+def setup_redis_wsl():
+    print_step("Checking Redis (WSL2)")
+    
+    if platform.system() == "Windows":
+        # Check if running in WSL or can access WSL
+        try:
+            subprocess.run(["wsl", "--status"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("WSL2 detected.")
+            
+            # Check if redis-server is installed in default distro
+            print("Checking Redis in WSL2...")
+            result = subprocess.run(["wsl", "bash", "-c", "which redis-server"], stdout=subprocess.PIPE)
+            if result.returncode != 0:
+                print("Redis not found in WSL2. Attempting installation...")
+                subprocess.run(["wsl", "sudo", "apt-get", "update"], check=True)
+                subprocess.run(["wsl", "sudo", "apt-get", "install", "-y", "redis-server"], check=True)
+                print("Redis installed in WSL2.")
+            else:
+                print("Redis found in WSL2.")
+                
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("Warning: WSL2 not detected or accessible. Redis setup skipped.")
+    elif platform.system() == "Linux":
+        # Check local redis
+        if shutil.which("redis-server") is None:
+             print("Redis not found. Please install redis-server (e.g., sudo apt install redis-server).")
+        else:
+            print("Redis detected locally.")
 
 def main():
-    print("=" * 50)
-    print("VisionLab Setup")
-    print("=" * 50)
-    print()
+    print("Starting VisionLab Setup...")
     
-    # Run checks
-    checks = [
-        ("Python Version", check_python_version),
-        ("pip", check_pip),
-    ]
+    check_python_version()
+    install_dependencies() # Install torch first for GPU check
+    check_gpu()
+    setup_dvc()
+    setup_redis_wsl()
     
-    all_passed = True
-    for name, check in checks:
-        if not check():
-            all_passed = False
-    
-    if not all_passed:
-        print("\n❌ Some requirements are not met. Please fix the issues above.")
-        return 1
-    
-    # Install dependencies
-    if not install_dependencies():
-        return 1
-    
-    # Post-install checks
-    print("\n" + "-" * 50)
-    print("Optional Features")
-    print("-" * 50)
-    check_cuda()
-    check_wsl2()
-    
-    # Create directories
-    print("\n" + "-" * 50)
-    print("Setup")
-    print("-" * 50)
-    create_directories()
-    
-    print("\n" + "=" * 50)
-    print("✓ Setup Complete!")
-    print("=" * 50)
-    print("\nTo start VisionLab, run:")
-    print("  python main.py")
-    print("\nThen open http://127.0.0.1:8000 in your browser")
-    
-    return 0
-
+    print("\nSetup Complete! \nRun 'python start_system.py' (to be created) to launch services.")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

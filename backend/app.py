@@ -6,45 +6,36 @@ import os
 import uuid
 import shutil
 import asyncio
+from typing import List, Dict, Optional
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Query, Depends
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
-from sqlalchemy.orm import selectinload
 import aiofiles
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy import func, delete
 
-from backend.config import get_settings, Settings
-from backend.database import (
-    get_database_engine, create_tables, get_session_maker,
-    Project, ProjectClass, Dataset, Image, Annotation, Model, TrainingLog
-)
-from backend.schemas import (
-    ProjectCreate, ProjectResponse, ProjectClassCreate, ProjectClassResponse,
-    DatasetCreate, DatasetResponse, ImageResponse, 
-    AnnotationCreate, AnnotationResponse, AnnotationBulkSave,
-    ModelCreate, ModelResponse, TrainingConfig, TrainingStatus, TrainingLogResponse,
-    InferenceRequest, InferenceResponse, Detection,
-    ExportRequest, ExportResponse, AugmentationConfig, ProjectStats,
-    DistributeImagesRequest
-)
-from backend.image_utils import ImageProcessor, DataAugmentor
-from backend.export_utils import DatasetExporter
-from backend.training import TrainingPipeline, InferencePipeline
+from backend.config import get_settings
+from backend.database import get_db, init_db, Project, Dataset, Image, Annotation, ProjectClass, Model, get_database_engine, create_tables, get_session_maker
+from backend.training import TrainingPipeline
+from backend.inference import InferencePipeline
+from backend.augmentation import DataAugmentor
+from backend.dataset_export import DatasetExporter
+from backend import auth, nodes, registry
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="VisionLab",
-    description="Local Computer Vision Platform",
-    version="1.0.0"
-)
+settings = get_settings()
 
-# CORS middleware
+app = FastAPI(title="VisionLab API", version="1.0.0")
+
+# Include Routers
+app.include_router(nodes.router)
+app.include_router(registry.router)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,11 +44,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global instances
-settings = get_settings()
-engine = None
-SessionLocal = None
-image_processor = ImageProcessor(cache_dir=settings.cache_dir)
+# Initialize pipelines
+image_processor = DataAugmentor()
 training_pipeline = TrainingPipeline(
     settings.models_dir, 
     settings.datasets_dir,
@@ -68,7 +56,6 @@ dataset_exporter = DatasetExporter(settings.exports_dir)
 
 # WebSocket connections for real-time updates
 active_connections: Dict[str, List[WebSocket]] = {}
-
 
 async def get_db() -> AsyncSession:
     """Dependency for database session"""
@@ -108,49 +95,6 @@ async def root():
 
 # ============== Projects ==============
 @app.get("/api/projects", response_model=List[ProjectResponse])
-async def list_projects(db: AsyncSession = Depends(get_db)):
-    """List all projects"""
-    result = await db.execute(
-        select(Project).options(selectinload(Project.classes)).order_by(Project.created_at.desc())
-    )
-    projects = result.scalars().all()
-    return projects
-
-
-@app.post("/api/projects", response_model=ProjectResponse)
-async def create_project(project: ProjectCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new project"""
-    db_project = Project(
-        name=project.name,
-        description=project.description,
-        project_type=project.project_type
-    )
-    db.add(db_project)
-    await db.flush()
-    
-    # Add classes
-    for cls in project.classes:
-        db_class = ProjectClass(
-            project_id=db_project.id,
-            name=cls.name,
-            color=cls.color
-        )
-        db.add(db_class)
-    
-    await db.commit()
-    await db.refresh(db_project)
-    
-    # Create project directories
-    project_dir = settings.datasets_dir / str(db_project.id)
-    project_dir.mkdir(parents=True, exist_ok=True)
-    
-    result = await db.execute(
-        select(Project).options(selectinload(Project.classes)).where(Project.id == db_project.id)
-    )
-    return result.scalar_one()
-
-
-@app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
     """Get project by ID"""
     result = await db.execute(
@@ -362,24 +306,6 @@ async def list_images(
 
 
 @app.post("/api/datasets/{dataset_id}/upload")
-async def upload_images(
-    dataset_id: int,
-    files: List[UploadFile] = File(...),
-    db: AsyncSession = Depends(get_db)
-):
-    """Upload images to dataset"""
-    # Get dataset to find project_id
-    result = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
-    dataset = result.scalar_one_or_none()
-    if not dataset:
-        raise HTTPException(status_code=404, detail="Dataset not found")
-    
-    dataset_dir = settings.datasets_dir / str(dataset.project_id) / str(dataset_id)
-    dataset_dir.mkdir(parents=True, exist_ok=True)
-    
-    uploaded = []
-    
-    for file in files:
         # Generate unique filename
         ext = Path(file.filename).suffix
         unique_name = f"{uuid.uuid4()}{ext}"
