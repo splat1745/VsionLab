@@ -148,3 +148,17 @@ async def create_tables(engine):
 def get_session_maker(engine):
     """Get async session maker"""
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+# Global session maker (initialized in app startup)
+AsyncSessionLocal = None
+
+
+async def get_db() -> AsyncSession:
+    """Dependency for database session"""
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Database session maker not initialized")
+    
+    async with AsyncSessionLocal() as session:
+        yield session
+

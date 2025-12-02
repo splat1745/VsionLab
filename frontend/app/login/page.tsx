@@ -23,7 +23,7 @@ export default function LoginPage() {
       formData.append("username", username)
       formData.append("password", password)
       
-      const res = await axios.post("http://localhost:8000/token", formData)
+      const res = await axios.post("http://localhost:8000/api/token", formData)
       login(res.data.access_token)
     } catch (err) {
       setError("Invalid credentials")

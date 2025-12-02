@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import axios from "axios"
-import { useAuth } from "@/components/auth-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Image as ImageIcon, Tag, Layers, Brain, Rocket, Settings, AlertTriangle } from "lucide-react"
+import { StorageSelector, type StorageLocation } from "@/components/storage-selector"
+import { ImageUpload } from "@/components/image-upload"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Project {
   id: number
@@ -32,11 +40,14 @@ export default function ProjectOverview() {
   const params = useParams()
   const [project, setProject] = useState<Project | null>(null)
   const [stats, setStats] = useState<ProjectStats | null>(null)
-  const { user, isLoading } = useAuth()
-  const [activeUsers, setActiveUsers] = useState<string[]>([]) // Mock active users
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeUsers, setActiveUsers] = useState<string[]>([])
+  const [showStorageSelector, setShowStorageSelector] = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
+  const [storageLocation, setStorageLocation] = useState<StorageLocation | null>(null) // Mock active users
 
   useEffect(() => {
-    if (user && params.id) {
+    if (params.id) {
       fetchProject(Number(params.id))
       fetchStats(Number(params.id))
       // Mock conflict detection
@@ -44,7 +55,7 @@ export default function ProjectOverview() {
         setActiveUsers(["alice", "bob"])
       }
     }
-  }, [params.id, user])
+  }, [params.id])
 
   const fetchProject = async (id: number) => {
     try {
@@ -52,6 +63,8 @@ export default function ProjectOverview() {
       setProject(response.data)
     } catch (error) {
       console.error("Failed to fetch project:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -92,7 +105,7 @@ export default function ProjectOverview() {
           <Button variant="outline">
             <Settings className="mr-2 h-4 w-4" /> Settings
           </Button>
-          <Button>
+          <Button onClick={() => setShowStorageSelector(true)}>
             <ImageIcon className="mr-2 h-4 w-4" /> Upload Data
           </Button>
         </div>
@@ -221,6 +234,40 @@ export default function ProjectOverview() {
             </div>
         </TabsContent>
       </Tabs>
+
+      {/* Storage Selector Dialog */}
+      <StorageSelector
+        open={showStorageSelector}
+        onClose={() => setShowStorageSelector(false)}
+        onSelect={(location) => {
+          setStorageLocation(location)
+          setShowStorageSelector(false)
+          setShowUpload(true)
+        }}
+        projectId={project?.id || 0}
+      />
+
+      {/* Image Upload Dialog */}
+      <Dialog open={showUpload} onOpenChange={setShowUpload}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Upload Images</DialogTitle>
+            <DialogDescription>
+              Add images to your project for annotation and training.
+            </DialogDescription>
+          </DialogHeader>
+          {storageLocation && project && (
+            <ImageUpload
+              projectId={project.id}
+              storageLocation={storageLocation}
+              onComplete={() => {
+                setShowUpload(false)
+                fetchStats(project.id)
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

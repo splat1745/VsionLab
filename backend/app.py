@@ -6,11 +6,12 @@ import os
 import uuid
 import shutil
 import asyncio
+from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
 import aiofiles
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,28 +21,37 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func, delete
 
 from backend.config import get_settings
-from backend.database import Project, Dataset, Image, Annotation, ProjectClass, Model, get_database_engine, create_tables, get_session_maker
+from backend.database import Project, Dataset, Image, Annotation, ProjectClass, Model, get_database_engine, create_tables, get_session_maker, get_db
 from backend.training import TrainingPipeline
 from backend.inference import InferencePipeline
 from backend.augmentation import DataAugmentor
 from backend.dataset_export import DatasetExporter
 from backend import auth, nodes, registry
+from backend.schemas import (
+    ProjectResponse, ProjectStats, ProjectClassResponse, ProjectClassCreate,
+    DatasetResponse, DatasetCreate, ImageResponse, AnnotationResponse,
+    AnnotationCreate, AnnotationBulkSave, ModelResponse, ModelCreate,
+    TrainingConfig, DistributeImagesRequest, TrainingStatus,
+    InferenceRequest, ExportResponse, ExportRequest, ProjectCreate
+)
 
 settings = get_settings()
 
 app = FastAPI(title="VisionLab API", version="1.0.0")
 
 # Include Routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(nodes.router)
 app.include_router(registry.router)
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Initialize pipelines
@@ -57,22 +67,19 @@ dataset_exporter = DatasetExporter(settings.exports_dir)
 # WebSocket connections for real-time updates
 active_connections: Dict[str, List[WebSocket]] = {}
 
-# Database session dependency - defined locally
-async def get_db() -> AsyncSession:
-    """Dependency for database session"""
-    async with SessionLocal() as session:
-        yield session
-
+from backend import database
 
 @app.on_event("startup")
 async def startup():
     """Initialize database and directories on startup"""
-    global engine, SessionLocal
+    global engine
     
     settings.setup_directories()
     engine = await get_database_engine(settings.database_url)
     await create_tables(engine)
-    SessionLocal = get_session_maker(engine)
+    
+    # Initialize global session maker in database module
+    database.AsyncSessionLocal = get_session_maker(engine)
     
     print(f"VisionLab started on http://{settings.host}:{settings.port}")
 
@@ -96,6 +103,17 @@ async def root():
 
 # ============== Projects ==============
 @app.get("/api/projects", response_model=List[ProjectResponse])
+async def list_projects(db: AsyncSession = Depends(get_db)):
+    """Get all projects"""
+    result = await db.execute(
+        select(Project).options(selectinload(Project.classes))
+    )
+    projects = result.scalars().all()
+    return projects
+
+
+@app.get("/api/projects/{project_id}", response_model=ProjectResponse)
+@app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
     """Get project by ID"""
     result = await db.execute(
@@ -105,6 +123,79 @@ async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+@app.post("/api/projects", response_model=ProjectResponse)
+async def create_project(project: ProjectCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new project"""
+    db_project = Project(
+        name=project.name,
+        description=project.description,
+        project_type=project.project_type
+    )
+    db.add(db_project)
+    await db.flush()
+    
+    # Add classes if provided
+    for cls in project.classes:
+        db_class = ProjectClass(
+            project_id=db_project.id,
+            name=cls.name,
+            color=cls.color
+        )
+        db.add(db_class)
+    
+    await db.commit()
+    await db.refresh(db_project)
+    
+    # Load classes relationship
+    result = await db.execute(
+        select(Project).options(selectinload(Project.classes)).where(Project.id == db_project.id)
+    )
+    return result.scalar_one()
+
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
+    """Delete a project"""
+    result = await db.execute(
+        select(Project).where(Project.id == project_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    await db.delete(project)
+    await db.commit()
+    return {"message": "Project deleted successfully"}
+
+
+@app.put("/api/projects/{project_id}", response_model=ProjectResponse)
+async def update_project(project_id: int, project: ProjectCreate, db: AsyncSession = Depends(get_db)):
+    """Update a project"""
+    result = await db.execute(
+        select(Project).where(Project.id == project_id)
+    )
+    db_project = result.scalar_one_or_none()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Update project fields
+    db_project.name = project.name
+    db_project.description = project.description
+    db_project.project_type = project.project_type
+    
+    await db.commit()
+    await db.refresh(db_project)
+    
+    # Load classes relationship
+    result = await db.execute(
+        select(Project).options(selectinload(Project.classes)).where(Project.id == project_id)
+    )
+    return result.scalar_one()
+
+
+
 
 
 @app.delete("/api/projects/{project_id}")
@@ -274,18 +365,99 @@ async def create_dataset(dataset: DatasetCreate, db: AsyncSession = Depends(get_
 
 
 # ============== Images ==============
-@app.get("/api/projects/{project_id}/images", response_model=List[ImageResponse])
-async def list_project_images(
+@app.post("/api/projects/{project_id}/images")
+async def upload_image(
     project_id: int,
+    file: UploadFile = File(...),
+    storage_type: str = Form("project"),
+    storage_path: str = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all images in a project across all datasets"""
-    result = await db.execute(
-        select(Image)
-        .join(Dataset)
-        .where(Dataset.project_id == project_id)
+    """Upload an image to a project with flexible storage options"""
+    # Verify project exists
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Determine storage location
+    if storage_type == "project":
+        # Store in project folder: data/projects/{project_id}/images
+        storage_dir = settings.data_dir / "projects" / str(project_id) / "images"
+    elif storage_type == "custom" and storage_path:
+        # Store in custom directory
+        storage_dir = Path(storage_path)
+    elif storage_type == "existing":
+        # Create symbolic link (not implemented yet)
+        raise HTTPException(status_code=501, detail="Symbolic links not yet implemented")
+    elif storage_type == "external":
+        # External storage (not implemented yet)
+        raise HTTPException(status_code=501, detail="External storage not yet implemented")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid storage type")
+    
+    # Create directory if it doesn't exist
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ext = Path(file.filename).suffix
+    filename = f"{timestamp}_{file.filename}"
+    file_path = storage_dir / filename
+    
+    # Save file
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Create database entry - Image model expects dataset_id, not project_id
+    # We need to create or get a dataset for this project first
+    dataset_result = await db.execute(
+        select(Dataset).where(Dataset.project_id == project_id).limit(1)
     )
-    return result.scalars().all()
+    dataset = dataset_result.scalar_one_or_none()
+    
+    if not dataset:
+        # Create a default dataset for this project
+        dataset = Dataset(
+            project_id=project_id,
+            name="Default Dataset",
+            version="1.0"
+        )
+        db.add(dataset)
+        await db.commit()
+        await db.refresh(dataset)
+    
+    db_image = Image(
+        dataset_id=dataset.id,
+        filename=file.filename,
+        filepath=str(file_path),
+        width=0,  # TODO: Extract actual dimensions
+        height=0
+    )
+    db.add(db_image)
+    await db.commit()
+    await db.refresh(db_image)
+    
+    return {
+        "id": db_image.id,
+        "filename": file.filename,
+        "path": str(file_path),
+        "storage_type": storage_type
+    }
+
+
+@app.get("/api/projects/{project_id}/images")
+async def list_images(project_id: int, db: AsyncSession = Depends(get_db)):
+    """List all images in a project"""
+    result = await db.execute(
+        select(Image).where(Image.project_id == project_id)
+    )
+    images = result.scalars().all()
+    return images
+
+
+@app.post("/api/projects/{project_id}/images/bulk")
 
 
 @app.get("/api/datasets/{dataset_id}/images", response_model=List[ImageResponse])

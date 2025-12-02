@@ -50,11 +50,14 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/visionlab.db"
     
-    # Redis (WSL2)
-    redis_url: str = "redis://localhost:6379/0"
+    # Redis Configuration (WSL2)
+    # Note: If Redis is in WSL2, Windows cannot connect to localhost:6379
+    # You may need to use the WSL2 IP address instead
+    # Get WSL2 IP with: wsl hostname -I
+    redis_url: str = "redis://172.19.174.47:6379/0"  # Use your WSL2 IP
     
-    # Security
-    node_api_key: str = "visionlab-node-secret-key"
+    # Node API Key for distributed training
+    node_api_key: str = "change-this-secret-key"
     
     class Config:
         env_file = ".env"

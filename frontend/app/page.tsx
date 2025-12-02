@@ -4,12 +4,20 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Plus, Search, MoreVertical, Folder, Image as ImageIcon, Tag, Layers } from "lucide-react"
 import axios from "axios"
-import { useAuth } from "@/components/auth-provider"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,13 +37,17 @@ interface Project {
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState("")
-  const { user, isLoading } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
+  const [open, setOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [newProjectName, setNewProjectName] = useState("")
+  const [newProjectDesc, setNewProjectDesc] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
-    if (user) {
-      fetchProjects()
-    }
-  }, [user])
+    fetchProjects()
+  }, [])
 
   const fetchProjects = async () => {
     try {
@@ -43,6 +55,74 @@ export default function Dashboard() {
       setProjects(res.data)
     } catch (error) {
       console.error("Failed to fetch projects", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const createProject = async () => {
+    if (!newProjectName.trim()) return
+    
+    setIsCreating(true)
+    try {
+      await axios.post("http://localhost:8000/api/projects", {
+        name: newProjectName,
+        description: newProjectDesc,
+        project_type: "object_detection",
+        classes: []
+      })
+      setOpen(false)
+      setNewProjectName("")
+      setNewProjectDesc("")
+      fetchProjects()
+    } catch (error) {
+      console.error("Failed to create project", error)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const deleteProject = async (projectId: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!confirm("Are you sure you want to delete this project?")) return
+    
+    try {
+      await axios.delete(`http://localhost:8000/api/projects/${projectId}`)
+      fetchProjects()
+    } catch (error) {
+      console.error("Failed to delete project", error)
+    }
+  }
+
+  const openEditDialog = (project: Project, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditingProject(project)
+    setNewProjectName(project.name)
+    setNewProjectDesc(project.description)
+    setEditOpen(true)
+  }
+
+  const updateProject = async () => {
+    if (!editingProject || !newProjectName.trim()) return
+    
+    setIsCreating(true)
+    try {
+      await axios.put(`http://localhost:8000/api/projects/${editingProject.id}`, {
+        name: newProjectName,
+        description: newProjectDesc
+      })
+      setEditOpen(false)
+      setEditingProject(null)
+      setNewProjectName("")
+      setNewProjectDesc("")
+      fetchProjects()
+    } catch (error) {
+      console.error("Failed to update project", error)
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -59,7 +139,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground">Manage your computer vision projects.</p>
         </div>
-        <Button>
+        <Button onClick={() => setOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> New Project
         </Button>
       </div>
@@ -92,8 +172,12 @@ export default function Dashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => openEditDialog(project, e)}>
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => deleteProject(project.id, e)} className="text-destructive">
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -135,12 +219,84 @@ export default function Dashboard() {
             <p className="text-muted-foreground mb-4">
               Get started by creating your first computer vision project.
             </p>
-            <Button>
+            <Button onClick={() => setOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Create Project
             </Button>
           </div>
         )}
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Create a new computer vision project to start training models.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Project Name</Label>
+              <Input
+                id="name"
+                placeholder="My Vision Project"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                placeholder="Describe your project..."
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={createProject} disabled={isCreating || !newProjectName.trim()}>
+              {isCreating ? "Creating..." : "Create Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>
+              Update your project details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Project Name</Label>
+              <Input
+                id="edit-name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Input
+                id="edit-description"
+                value={newProjectDesc}
+                onChange={(e) => setNewProjectDesc(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={updateProject} disabled={isCreating || !newProjectName.trim()}>
+              {isCreating ? "Updating..." : "Update Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

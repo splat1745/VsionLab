@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import Depends, HTTPException, status, Security
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -93,7 +93,67 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
     """Verify API Key for inter-node communication"""
     if api_key == settings.node_api_key:
         return True
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Could not validate API Key"
+from fastapi import APIRouter
+
+router = APIRouter(tags=["auth"])
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = fake_users_db.get(form_data.username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user_in_db = UserInDB(**user)
+    if not verify_password(form_data.password, user_in_db.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_in_db.username}, expires_delta=access_token_expires
     )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/users/me", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+# Registration Schema
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: str | None = None
+    full_name: str | None = None
+
+@router.post("/register", response_model=Token)
+async def register_user(user: UserCreate):
+    """Register a new user"""
+    # Check if username already exists
+    if user.username in fake_users_db:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user.password)
+    fake_users_db[user.username] = {
+        "username": user.username,
+        "full_name": user.full_name,
+        "email": user.email,
+        "hashed_password": hashed_password,
+        "disabled": False,
+    }
+    
+    # Create access token for immediate login
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
