@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Image as ImageIcon, Tag, Layers, Brain, Rocket, Settings, AlertTriangle } from "lucide-react"
 import { StorageSelector, type StorageLocation } from "@/components/storage-selector"
 import { ImageUpload } from "@/components/image-upload"
+import { AnnotationCanvas } from "@/components/annotation-canvas"
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,7 @@ interface Project {
   description: string
   project_type: string
   created_at: string
-  classes: { name: string, color: string }[]
+  classes: { id: number, name: string, color: string }[]
 }
 
 interface ProjectStats {
@@ -36,6 +37,13 @@ interface ProjectStats {
   split_distribution: Record<string, number>
 }
 
+interface Image {
+  id: number
+  filename: string
+  filepath: string
+  is_annotated: boolean
+}
+
 export default function ProjectOverview() {
   const params = useParams()
   const [project, setProject] = useState<Project | null>(null)
@@ -44,12 +52,17 @@ export default function ProjectOverview() {
   const [activeUsers, setActiveUsers] = useState<string[]>([])
   const [showStorageSelector, setShowStorageSelector] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
-  const [storageLocation, setStorageLocation] = useState<StorageLocation | null>(null) // Mock active users
+  const [storageLocation, setStorageLocation] = useState<StorageLocation | null>(null)
+  
+  // Annotation state
+  const [images, setImages] = useState<Image[]>([])
+  const [selectedImage, setSelectedImage] = useState<Image | null>(null)
 
   useEffect(() => {
     if (params.id) {
       fetchProject(Number(params.id))
       fetchStats(Number(params.id))
+      fetchImages(Number(params.id))
       // Mock conflict detection
       if (Math.random() > 0.7) {
         setActiveUsers(["alice", "bob"])
@@ -74,6 +87,15 @@ export default function ProjectOverview() {
       setStats(response.data)
     } catch (error) {
       console.error("Failed to fetch stats:", error)
+    }
+  }
+
+  const fetchImages = async (id: number) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/api/projects/${id}/images`)
+      setImages(response.data)
+    } catch (error) {
+      console.error("Failed to fetch images:", error)
     }
   }
 
@@ -197,14 +219,66 @@ export default function ProjectOverview() {
           </div>
         </TabsContent>
         
-        <TabsContent value="annotate">
-            <div className="flex items-center justify-center h-96 border-2 border-dashed rounded-lg">
-                <div className="text-center">
-                    <h3 className="text-lg font-semibold">Annotation Tool</h3>
-                    <p className="text-muted-foreground">Select an image to start annotating.</p>
-                    <Button className="mt-4" variant="secondary">Open Annotator</Button>
-                </div>
+        <TabsContent value="annotate" className="space-y-4">
+          {selectedImage ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={() => setSelectedImage(null)}>
+                  Back to Gallery
+                </Button>
+                <h3 className="font-medium">{selectedImage.filename}</h3>
+              </div>
+              <AnnotationCanvas
+                projectId={project.id}
+                imageId={selectedImage.id}
+                imageSrc={`http://localhost:8000/api/images/${selectedImage.id}/file`}
+                classes={project.classes}
+                onSave={() => {
+                  fetchStats(project.id)
+                  fetchImages(project.id)
+                }}
+              />
             </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {images.map((image) => (
+                <Card 
+                  key={image.id} 
+                  className="cursor-pointer hover:border-primary transition-colors overflow-hidden group"
+                  onClick={() => setSelectedImage(image)}
+                >
+                  <div className="aspect-square relative">
+                    <img
+                      src={`http://localhost:8000/api/images/${image.id}/thumbnail`}
+                      alt={image.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {image.is_annotated && (
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="secondary" className="bg-green-500/80 text-white hover:bg-green-500">
+                          Annotated
+                        </Badge>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  </div>
+                  <div className="p-2 text-xs truncate text-muted-foreground">
+                    {image.filename}
+                  </div>
+                </Card>
+              ))}
+              {images.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg text-muted-foreground">
+                  <ImageIcon className="h-8 w-8 mb-2" />
+                  <p>No images found</p>
+                  <Button variant="link" onClick={() => setShowStorageSelector(true)}>
+                    Upload some images
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="dataset">

@@ -422,7 +422,7 @@ async def upload_image(
         dataset = Dataset(
             project_id=project_id,
             name="Default Dataset",
-            version="1.0"
+            split="train"
         )
         db.add(dataset)
         await db.commit()
@@ -448,20 +448,20 @@ async def upload_image(
 
 
 @app.get("/api/projects/{project_id}/images")
-async def list_images(project_id: int, db: AsyncSession = Depends(get_db)):
+async def list_project_images(project_id: int, db: AsyncSession = Depends(get_db)):
     """List all images in a project"""
     result = await db.execute(
-        select(Image).where(Image.project_id == project_id)
+        select(Image).join(Dataset).where(Dataset.project_id == project_id)
     )
     images = result.scalars().all()
     return images
 
 
-@app.post("/api/projects/{project_id}/images/bulk")
+# @app.post("/api/projects/{project_id}/images/bulk")
 
 
 @app.get("/api/datasets/{dataset_id}/images", response_model=List[ImageResponse])
-async def list_images(
+async def list_dataset_images(
     dataset_id: int,
     skip: int = 0,
     limit: int = 100,

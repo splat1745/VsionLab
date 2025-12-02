@@ -30,8 +30,7 @@ class ModelVersionResponse(BaseModel):
 @router.get("/", response_model=List[ModelVersionResponse])
 async def list_models(
     project_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: auth.User = Depends(auth.get_current_active_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """List all models in the registry, optionally filtered by project"""
     query = select(Model).order_by(Model.created_at.desc())
@@ -46,8 +45,7 @@ async def list_models(
 @router.get("/{model_id}", response_model=ModelVersionResponse)
 async def get_model(
     model_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: auth.User = Depends(auth.get_current_active_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get specific model details"""
     result = await db.execute(select(Model).where(Model.id == model_id))
@@ -62,8 +60,7 @@ async def get_model(
 async def promote_model(
     model_id: int,
     stage: str, # e.g., "production", "staging"
-    db: AsyncSession = Depends(get_db),
-    current_user: auth.User = Depends(auth.get_current_active_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """Promote a model to a specific stage (Deployment)"""
     # This would typically involve tagging the model or moving files
