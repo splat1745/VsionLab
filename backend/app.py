@@ -92,13 +92,13 @@ async def shutdown():
 
 
 # ============== Static Files ==============
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+app.mount("/static", StaticFiles(directory="frontend_vanilla"), name="static")
 
 
 @app.get("/")
 async def root():
     """Serve main application"""
-    return FileResponse("frontend/index.html")
+    return FileResponse("frontend_vanilla/index.html")
 
 
 # ============== Projects ==============
@@ -575,6 +575,34 @@ async def get_image(image_id: int, db: AsyncSession = Depends(get_db)):
         "created_at": image.created_at,
         "annotations": annotations
     }
+
+
+@app.get("/api/images/{image_id}/annotations", response_model=List[AnnotationResponse])
+async def get_image_annotations(image_id: int, db: AsyncSession = Depends(get_db)):
+    """Get annotations for an image"""
+    result = await db.execute(
+        select(Annotation).where(Annotation.image_id == image_id)
+    )
+    annotations = result.scalars().all()
+    
+    response = []
+    for ann in annotations:
+        result = await db.execute(
+            select(ProjectClass).where(ProjectClass.id == ann.class_id)
+        )
+        cls = result.scalar_one_or_none()
+        response.append(AnnotationResponse(
+            id=ann.id,
+            image_id=ann.image_id,
+            class_id=ann.class_id,
+            annotation_type=ann.annotation_type,
+            data=ann.data,
+            created_at=ann.created_at,
+            class_name=cls.name if cls else None,
+            class_color=cls.color if cls else None
+        ))
+    
+    return response
 
 
 @app.get("/api/images/{image_id}/file")

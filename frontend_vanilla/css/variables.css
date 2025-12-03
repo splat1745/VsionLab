@@ -1,0 +1,70 @@
+:root {
+    /* Core Colors - Monochrome & Accents */
+    --color-background: #000000;
+    --color-foreground: #ffffff;
+    
+    --color-accents-1: #111111;
+    --color-accents-2: #333333;
+    --color-accents-3: #444444;
+    --color-accents-4: #666666;
+    --color-accents-5: #888888;
+    --color-accents-6: #999999;
+    --color-accents-7: #eaeaea;
+    --color-accents-8: #fafafa;
+    
+    /* Brand Colors */
+    --color-primary: #ffffff; /* Stark white for primary actions in dark mode */
+    --color-primary-foreground: #000000;
+    --color-secondary: #333333;
+    --color-secondary-foreground: #ffffff;
+    
+    /* Semantic Colors */
+    --color-success: #0070f3; /* Vercel Blue for success/active states */
+    --color-error: #ff4444;
+    --color-warning: #f5a623;
+    
+    /* UI Elements */
+    --color-border: #333333;
+    --color-card-bg: rgba(17, 17, 17, 0.8);
+    --color-card-border: rgba(255, 255, 255, 0.1);
+    
+    /* Typography */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    
+    /* Spacing & Layout */
+    --spacing-unit: 4px;
+    --container-width: 1200px;
+    --header-height: 64px;
+    --sidebar-width: 260px;
+    
+    /* Effects */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-full: 9999px;
+    
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    
+    --backdrop-blur: blur(12px);
+}
+
+/* Light Mode Override (Optional, but good to have ready) */
+[data-theme="light"] {
+    --color-background: #ffffff;
+    --color-foreground: #000000;
+    --color-accents-1: #fafafa;
+    --color-accents-2: #eaeaea;
+    --color-border: #eaeaea;
+    --color-card-bg: rgba(255, 255, 255, 0.8);
+    --color-card-border: rgba(0, 0, 0, 0.1);
+    --color-primary: #000000;
+    --color-primary-foreground: #ffffff;
+    --color-secondary: #eaeaea;
+    --color-secondary-foreground: #000000;
+}

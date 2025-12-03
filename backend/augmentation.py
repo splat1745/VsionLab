@@ -94,6 +94,37 @@ class DataAugmentor:
             aug_img, aug_bboxes, aug_labels = self.augment(image, bboxes, class_labels)
             samples.append((aug_img, list(aug_bboxes), list(aug_labels)))
         return samples
+    
+    def get_image_dimensions(self, filepath: str) -> Tuple[int, int]:
+        """Get image dimensions"""
+        img = cv2.imread(filepath)
+        if img is None:
+            return 0, 0
+        return img.shape[1], img.shape[0]
+    
+    def create_thumbnail(self, filepath: str, size: int = 200) -> bytes:
+        """Create thumbnail from image"""
+        img = cv2.imread(filepath)
+        if img is None:
+            return b""
+        
+        # Resize maintaining aspect ratio
+        h, w = img.shape[:2]
+        scale = size / max(h, w)
+        new_h, new_w = int(h * scale), int(w * scale)
+        
+        thumb = cv2.resize(img, (new_w, new_h))
+        
+        # Encode to jpg
+        _, buffer = cv2.imencode('.jpg', thumb)
+        return buffer.tobytes()
+    
+    def load_image_rgb(self, filepath: str) -> np.ndarray:
+        """Load image in RGB format"""
+        img = cv2.imread(filepath)
+        if img is None:
+            raise ValueError(f"Could not load image: {filepath}")
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
 class MosaicAugmentor:

@@ -1,0 +1,88 @@
+/* Button Components */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 1.25rem;
+    height: 40px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Primary Button */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+}
+
+.btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* Secondary Button */
+.btn-secondary {
+    background-color: var(--color-secondary);
+    color: var(--color-secondary-foreground);
+    border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-accents-2);
+    border-color: var(--color-accents-4);
+}
+
+/* Ghost Button */
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-foreground);
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background-color: var(--color-accents-2);
+}
+
+/* Destructive Button */
+.btn-destructive {
+    background-color: rgba(255, 68, 68, 0.1);
+    color: var(--color-error);
+}
+
+.btn-destructive:hover:not(:disabled) {
+    background-color: rgba(255, 68, 68, 0.2);
+}
+
+/* Sizes */
+.btn-sm {
+    height: 32px;
+    padding: 0 0.75rem;
+    font-size: 0.8rem;
+}
+
+.btn-lg {
+    height: 48px;
+    padding: 0 2rem;
+    font-size: 1rem;
+}
+
+.btn-icon {
+    width: 40px;
+    padding: 0;
+}

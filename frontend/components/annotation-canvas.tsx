@@ -60,16 +60,20 @@ export function AnnotationCanvas({
       const res = await axios.get(
         `http://localhost:8000/api/images/${imageId}/annotations`
       )
-      const loadedBoxes: BoundingBox[] = res.data.map((ann: any) => ({
-        id: ann.id,
-        x: ann.x,
-        y: ann.y,
-        width: ann.width,
-        height: ann.height,
-        classId: ann.class_id,
-        className: classes.find((c) => c.id === ann.class_id)?.name || "Unknown",
-        color: classes.find((c) => c.id === ann.class_id)?.color || "#FF0000"
-      }))
+      const loadedBoxes: BoundingBox[] = res.data.map((ann: any) => {
+        // Extract bbox data from the 'data' field
+        const data = ann.data || {}
+        return {
+          id: ann.id.toString(),
+          x: data.x || 0,
+          y: data.y || 0,
+          width: data.width || 0,
+          height: data.height || 0,
+          classId: ann.class_id,
+          className: ann.class_name || classes.find((c) => c.id === ann.class_id)?.name || "Unknown",
+          color: ann.class_color || classes.find((c) => c.id === ann.class_id)?.color || "#FF0000"
+        }
+      })
       setBoxes(loadedBoxes)
     } catch (error) {
       console.error("Failed to load annotations:", error)
@@ -195,14 +199,18 @@ export function AnnotationCanvas({
   const saveAnnotations = async () => {
     try {
       await axios.post(
-        `http://localhost:8000/api/images/${imageId}/annotations`,
+        `http://localhost:8000/api/annotations/bulk`,
         {
+          image_id: imageId,
           annotations: boxes.map((box) => ({
             class_id: box.classId,
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height
+            annotation_type: "bbox",
+            data: {
+              x: box.x,
+              y: box.y,
+              width: box.width,
+              height: box.height
+            }
           }))
         }
       )
