@@ -46,63 +46,9 @@
 
                 return await response.json();
             } catch (error) {
-                console.warn('API Error or Offline Mode:', error);
-                console.log('Falling back to mock data for:', endpoint);
-                return this.getMockData(endpoint);
+                console.error('API Error:', error);
+                throw error;
             }
-        }
-
-        getMockData(endpoint) {
-            // Mock Projects
-            if (endpoint === '/projects') {
-                return [
-                    {
-                        id: 1,
-                        name: 'Traffic Detection',
-                        description: 'Detecting cars and pedestrians in city traffic.',
-                        project_type: 'object_detection',
-                        created_at: new Date().toISOString(),
-                        classes: ['car', 'person', 'bus', 'traffic_light']
-                    },
-                    {
-                        id: 2,
-                        name: 'Defect Detection',
-                        description: 'Identifying manufacturing defects on PCB boards.',
-                        project_type: 'object_detection',
-                        created_at: new Date(Date.now() - 86400000).toISOString(),
-                        classes: ['scratch', 'dent', 'missing_component']
-                    }
-                ];
-            }
-            
-            // Mock Project Details
-            if (endpoint.match(/^\/projects\/\d+$/)) {
-                return {
-                    id: 1,
-                    name: 'Traffic Detection',
-                    description: 'Detecting cars and pedestrians in city traffic.',
-                    project_type: 'object_detection',
-                    created_at: new Date().toISOString(),
-                    classes: ['car', 'person', 'bus', 'traffic_light']
-                };
-            }
-
-            // Mock Project Images
-            if (endpoint.match(/^\/projects\/\d+\/images$/)) {
-                return []; // Return empty array or mock images if needed
-            }
-
-            // Mock Token (Login)
-            if (endpoint === '/token') {
-                return { access_token: 'mock_token_123', token_type: 'bearer' };
-            }
-
-            // Mock Delete
-            if (endpoint.match(/^\/projects\/\d+$/)) {
-                return { success: true };
-            }
-
-            throw error; // Rethrow if no mock data
         }
 
         get(endpoint) {
