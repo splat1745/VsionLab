@@ -51,11 +51,20 @@
         }
 
         grid.innerHTML = projects.map(project => `
-            <div class="card project-card" onclick="window.location.hash = '#/projects/${project.id}'">
+            <div class="card project-card" onclick="if(!event.target.closest('.dropdown')) window.location.hash = '#/projects/${project.id}'">
                 <div class="card-header">
                     <div class="flex justify-between items-start">
                         <div class="badge badge-default mb-2">${project.project_type}</div>
-                        <i class="fas fa-ellipsis-v text-muted"></i>
+                        <div class="dropdown relative">
+                            <button class="btn btn-icon btn-ghost btn-sm" onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')">
+                                <i class="fas fa-ellipsis-v text-muted"></i>
+                            </button>
+                            <div class="dropdown-menu hidden absolute right-0 mt-1 w-32 bg-card-bg border border-border rounded-md shadow-lg z-10">
+                                <button class="w-full text-left px-4 py-2 text-sm hover:bg-accents-2 text-error" onclick="event.stopPropagation(); window.VisionLab.views.deleteProject(${project.id})">
+                                    <i class="fas fa-trash-alt mr-2"></i> Delete
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <h3 class="card-title">${project.name}</h3>
                     <p class="card-description">${project.description || 'No description'}</p>
@@ -66,7 +75,26 @@
                 </div>
             </div>
         `).join('');
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.add('hidden'));
+            }
+        });
     }
+
+    window.VisionLab.views.deleteProject = async (id) => {
+        if (confirm('Are you sure you want to delete this project?')) {
+            try {
+                await window.VisionLab.api.delete(`/projects/${id}`);
+                // Refresh
+                window.VisionLab.views.dashboard();
+            } catch (error) {
+                alert('Failed to delete project: ' + error.message);
+            }
+        }
+    };
 
     window.VisionLab.views.dashboard = renderDashboard;
 })();

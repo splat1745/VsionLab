@@ -102,7 +102,10 @@
                 projectImages: images 
             });
             
-            document.getElementById('project-name').textContent = project.name;
+            const nameEl = document.getElementById('project-name');
+            if (!nameEl) return; // View changed
+
+            nameEl.textContent = project.name;
             document.getElementById('stat-classes').textContent = project.classes.length;
             document.getElementById('stat-images').textContent = images.length;
             

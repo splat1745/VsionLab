@@ -97,6 +97,11 @@
                 return { access_token: 'mock_token_123', token_type: 'bearer' };
             }
 
+            // Mock Delete
+            if (endpoint.match(/^\/projects\/\d+$/)) {
+                return { success: true };
+            }
+
             throw error; // Rethrow if no mock data
         }
 
