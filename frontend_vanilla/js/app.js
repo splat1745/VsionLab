@@ -1,43 +1,48 @@
-import { Router } from './router.js';
-import { api } from './api.js';
-import { store } from './state.js';
+// Main Application Entry Point
+(function() {
+    const app = {
+        init: async () => {
+            console.log('VisionLab Initializing...');
+            
+            // Initialize Router
+            const Router = window.VisionLab.Router;
+            const views = window.VisionLab.views;
 
-import { renderLogin } from './views/login.js';
-import { renderDashboard } from './views/dashboard.js';
-import { renderProject } from './views/project.js';
+            // Initialize Modals
+            if (window.VisionLab.components.modals) {
+                window.VisionLab.components.modals.init();
+            }
 
-const app = {
-    init: async () => {
-        console.log('VisionLab Initializing...');
-        
-        // Check Auth
-        const token = localStorage.getItem('access_token');
-        if (!token && window.location.hash !== '#/login' && window.location.hash !== '#/register') {
-            window.location.hash = '#/login';
+            function renderPlaceholder(title) {
+                const main = document.getElementById('main-view');
+                main.innerHTML = `
+                    <div class="view-container">
+                        <h1>${title}</h1>
+                        <p>This view is under construction.</p>
+                    </div>
+                `;
+            }
+
+            app.router = new Router({
+                '/': views.dashboard,
+                '/projects': views.dashboard,
+                '/universe': views.universe,
+                '/settings': views.settings,
+                '/login': views.login,
+                '/projects/:id': (params) => views.project(params)
+            });
+
+            // Force initial route handling
+            app.router.handleRoute();
         }
+    };
 
-        // Initialize Router
-        app.router = new Router({
-            '/': renderDashboard,
-            '/projects': renderDashboard,
-            '/universe': () => renderPlaceholder('Universe'),
-            '/settings': () => renderPlaceholder('Settings'),
-            '/login': renderLogin,
-            '/projects/:id': (params) => renderProject(params)
-        });
+    window.VisionLab.app = app;
+    
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', app.init);
+    } else {
+        app.init();
     }
-};
-
-// Temporary placeholder renderer
-function renderPlaceholder(title) {
-    const main = document.getElementById('main-view');
-    main.innerHTML = `
-        <div class="view-container">
-            <h1>${title}</h1>
-            <p>This view is under construction.</p>
-        </div>
-    `;
-}
-
-window.app = app;
-app.init();
+})();
